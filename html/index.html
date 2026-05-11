@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="CUENTAS — ERP Personal de Gestión Financiera" />
+  <title>CUENTAS — ERP Personal</title>
+
+  <!-- ══════════════════════════════════════════════════════
+       ESTILOS — orden de carga importante
+  ══════════════════════════════════════════════════════ -->
+  <!-- Variables globales, reset y utilidades base -->
+  <link rel="stylesheet" href="../css/style.css" />
+  <!-- Estilos específicos del dashboard -->
+  <link rel="stylesheet" href="../css/dashboard.css" />
+  <!-- Sidebar, navbar, modales, tablas, formularios -->
+  <link rel="stylesheet" href="../css/modules.css" />
+  <!-- Breakpoints responsive -->
+  <link rel="stylesheet" href="../css/responsive.css" />
+
+  <!-- Favicon inline SVG -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2338bdf8'/><text x='16' y='23' text-anchor='middle' font-family='sans-serif' font-weight='800' font-size='18' fill='%23000'>C</text></svg>" />
+</head>
+
+<body>
+
+  <!-- ══════════════════════════════════════════════════════
+       ESTRUCTURA PRINCIPAL DE LA APP
+  ══════════════════════════════════════════════════════ -->
+  <div id="app">
+
+    <!-- ── Sidebar (montado por sidebar.js) ──────────────── -->
+    <div id="sidebar-mount"></div>
+
+    <!-- ── Contenido principal ───────────────────────────── -->
+    <div class="app-content" id="app-content">
+
+      <!-- Navbar superior (montado por navbar.js) -->
+      <div id="navbar-mount"></div>
+
+      <!-- Área de páginas / módulos -->
+      <main class="page-area" id="page-area">
+        <div id="page-content">
+          <!-- El router inyecta aquí el módulo activo -->
+
+          <!-- Pantalla de carga inicial -->
+          <div style="
+            display:flex; align-items:center; justify-content:center;
+            min-height:60vh; flex-direction:column; gap:16px;
+          ">
+            <div style="
+              width:40px; height:40px;
+              border:2px solid rgba(56,189,248,0.15);
+              border-top-color:var(--accent);
+              border-radius:50%;
+              animation:spin 0.8s linear infinite;
+            "></div>
+            <p style="color:var(--text-muted); font-size:0.875rem">Iniciando CUENTAS…</p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+  </div>
+
+  <!-- Spinner animation -->
+  <style>
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+
+  <!-- ══════════════════════════════════════════════════════
+       SCRIPTS — carga en orden correcto
+  ══════════════════════════════════════════════════════ -->
+
+  <!-- Punto de entrada modular. app.js importa configuración, DB, UI y módulos. -->
+  <script type="module" src="../js/app.js"></script>
+
+</body>
+</html>
