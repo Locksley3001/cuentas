@@ -47,6 +47,13 @@ const DashboardModule = (() => {
     const income = Number(globalData.income) || 0;
     const expense = Number(globalData.expense) || 0;
     const profit = income - expense;
+    const fm = globalData.financialMetrics || {};
+    const patrimonio = Number(fm.patrimonio ?? globalData.patrimonio ?? 0);
+    const liquidCapital = Number(fm.liquidCapital ?? globalData.liquidCapital ?? 0);
+    const investedCapital = Number(fm.investedCapital ?? globalData.investedCapital ?? 0);
+    const realProfit = Number(fm.realProfit ?? globalData.realProfit ?? profit);
+    const activePortfolio = Number(fm.activePortfolio ?? globalData.activePortfolio ?? loanSummary.active);
+    const projectedReturn = Number(fm.projectedReturn ?? globalData.projectedReturn ?? 0);
     const investmentValue = Number(portfolio.current) || 0;
     const capital = investmentValue + (Number(assetValue) || 0);
 
@@ -66,15 +73,15 @@ const DashboardModule = (() => {
         </div>
 
         <div class="metrics-grid">
-          ${Cards.metric({ label: 'Capital Total', value: fmt(capital), delta: '', deltaType: 'neutral', icon: '◈', type: 'capital', sub: 'Activos + inversiones reales' })}
-          ${Cards.metric({ label: 'Ingresos (año)', value: fmt(income), delta: '', deltaType: 'neutral', icon: '▲', type: 'income', sub: `${code} año en curso` })}
-          ${Cards.metric({ label: 'Gastos (año)', value: fmt(expense), delta: '', deltaType: 'neutral', icon: '▼', type: 'expense', sub: 'Movimientos reales' })}
-          ${Cards.metric({ label: 'Ganancia Neta', value: fmtSigned(profit), delta: '', deltaType: profit >= 0 ? 'up' : 'down', icon: '◎', type: 'profit', sub: 'Ingresos - gastos' })}
+          ${Cards.metric({ label: 'Patrimonio', value: fmtSigned(patrimonio), delta: '', deltaType: patrimonio >= 0 ? 'up' : 'down', icon: '◆', type: 'capital', sub: 'Liquidez + inversiones + activos - pasivos' })}
+          ${Cards.metric({ label: 'Capital liquido', value: fmtSigned(liquidCapital), delta: '', deltaType: liquidCapital >= 0 ? 'up' : 'down', icon: '▲', type: 'income', sub: 'Disponible estimado' })}
+          ${Cards.metric({ label: 'Capital invertido', value: fmt(investedCapital), delta: '', deltaType: 'neutral', icon: '●', type: 'profit', sub: 'Cartera + inversiones + activos comerciales' })}
+          ${Cards.metric({ label: 'Utilidad real', value: fmtSigned(realProfit), delta: '', deltaType: realProfit >= 0 ? 'up' : 'down', icon: '▼', type: 'expense', sub: 'Ganancias reales sin devolucion de capital' })}
         </div>
 
         <div class="quick-stats">
-          ${Cards.quickStat({ label: 'Portafolio', value: fmt(investmentValue), color: 'accent' })}
-          ${Cards.quickStat({ label: 'Préstamos activos', value: fmt(loanSummary.active), color: 'warning' })}
+          ${Cards.quickStat({ label: 'Cartera activa', value: fmt(activePortfolio), color: 'warning' })}
+          ${Cards.quickStat({ label: 'Retorno proyectado', value: fmt(projectedReturn), color: 'accent' })}
           ${Cards.quickStat({ label: 'Activos', value: fmt(assetValue), color: 'accent-2' })}
         </div>
 

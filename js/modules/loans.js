@@ -344,7 +344,8 @@ export async function createLoan(data) {
     description : `Préstamo otorgado a ${loan.clientName}`,
     reference   : `LOAN-${id}`,
     date        : loan.startDate,
-    meta        : { loanId: id },
+    sourceModule: 'loans',
+    meta        : { loanId: id, capitalPlacedAmount: loan.amount },
   });
 
   // ── Integración con dashboard.js ───────────────────────────
@@ -582,6 +583,10 @@ export async function registerPayment(loanId, payData) {
   // Calcular saldo antes del pago
   const prevPayments = _paymentsCache[loanId] || [];
   const balance      = calcBalance(loan, prevPayments);
+  const previousPaid = prevPayments.reduce((s, p) => s + (p.amount || 0), 0);
+  const principalPendingBeforePayment = Math.max((loan.amount || 0) - previousPaid, 0);
+  const principalAmount = Math.min(amount, principalPendingBeforePayment);
+  const interestAmount = Math.max(amount - principalAmount, 0);
 
   if (amount > balance.remaining + 0.01) {
     throw new Error(`El pago (${_formatCurrency(amount)}) supera el saldo pendiente (${_formatCurrency(balance.remaining)})`);
@@ -631,7 +636,17 @@ export async function registerPayment(loanId, payData) {
     description : `Pago de ${loan.clientName} — Préstamo #${loanId}${payment.isPartial ? ' (parcial)' : ''}`,
     reference   : `PAY-${payId}-LOAN-${loanId}`,
     date        : payment.date,
-    meta        : { loanId, paymentId: payId, isPaidOff },
+    sourceModule: 'loans',
+    realProfitImpact: 0,
+    meta        : {
+      loanId,
+      paymentId: payId,
+      isPaidOff,
+      principalAmount,
+      interestAmount,
+      capitalReturnAmount: principalAmount,
+      realProfitAmount: interestAmount,
+    },
   });
 
   // ── Integración con dashboard ───────────────────────────────

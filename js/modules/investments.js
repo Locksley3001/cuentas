@@ -950,6 +950,9 @@ export class InvestmentsModule {
       riesgo,
       estado,
       observaciones,
+      financeConcept: 'invested_capital',
+      capitalBucket: 'invested',
+      financialPurpose: 'commercial',
       totalGastos: 0, // se actualiza al agregar gastos
       updatedAt: new Date().toISOString(),
     };

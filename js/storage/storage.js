@@ -4,23 +4,7 @@
    ============================================================ */
 
 import { DB } from './db.js';
-
-const FINANCE_CATEGORY_LABELS = {
-  ventas: 'Ventas',
-  servicios: 'Servicios',
-  intereses: 'Intereses',
-  trading: 'Trading',
-  inversiones: 'Inversiones',
-  otros_ing: 'Otros ingresos',
-  capital_inicial: 'Capital inicial',
-  publicidad: 'Publicidad',
-  herramientas: 'Herramientas',
-  servidores: 'Servidores',
-  transporte: 'Transporte',
-  alimentacion: 'Alimentación',
-  mantenimiento: 'Mantenimiento',
-  otros_gas: 'Otros gastos',
-};
+import { getFinanceCategoryLabel } from '../finance/categories.js';
 
 const Storage = (() => {
 
@@ -212,7 +196,7 @@ const Storage = (() => {
       ...row,
       type: row.type === 'income' || row.type === 'ingreso' ? 'income' : row.type === 'expense' || row.type === 'egreso' ? 'expense' : row.type,
       category,
-      categoryLabel: row.categoryLabel || FINANCE_CATEGORY_LABELS[category] || category,
+      categoryLabel: row.categoryLabel || getFinanceCategoryLabel(category),
       amount: Number.isFinite(amount) ? amount : 0,
       date: row.date || row.fecha || row.timestamp || row.createdAt || new Date().toISOString(),
     };
@@ -321,7 +305,7 @@ const Storage = (() => {
       module: data.module || data.modulo || data.source || 'system',
       action: data.action || action || 'activity',
       category: data.category || data.type || 'general',
-      categoryLabel: data.categoryLabel || FINANCE_CATEGORY_LABELS[data.category] || null,
+      categoryLabel: data.categoryLabel || getFinanceCategoryLabel(data.category) || null,
       description: data.description || data.text || data.desc || action || 'Actividad registrada',
       amount: Number.isFinite(Number(data.amount)) ? Number(data.amount) : null,
       status: data.status || data.estado || null,

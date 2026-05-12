@@ -3,25 +3,10 @@ import { showToast } from '../components/modal.js';
 import { HistoryModule } from './history.js';
 import { Investments } from './investments.js';
 import { Assets } from './assets.js';
+import { getFinanceCategoryLabel } from '../finance/categories.js';
+import { financeStateManager } from '../finance/finance-state-manager.js';
 
 let initialized = false;
-
-const FINANCE_CATEGORY_LABELS = {
-  ventas: 'Ventas',
-  servicios: 'Servicios',
-  intereses: 'Intereses',
-  trading: 'Trading',
-  inversiones: 'Inversiones',
-  otros_ing: 'Otros ingresos',
-  capital_inicial: 'Capital inicial',
-  publicidad: 'Publicidad',
-  herramientas: 'Herramientas',
-  servidores: 'Servidores',
-  transporte: 'Transporte',
-  alimentacion: 'Alimentación',
-  mantenimiento: 'Mantenimiento',
-  otros_gas: 'Otros gastos',
-};
 
 export function setupGlobalIntegrations() {
   if (initialized) return;
@@ -72,6 +57,7 @@ async function handleFinanceUpdate(event) {
     entityId: data.id,
   });
 
+  financeStateManager.invalidate(`${source}:${eventType}`);
   refreshActiveDashboard();
 }
 
@@ -187,11 +173,24 @@ export async function getGlobalDashboardData() {
   const loanActive = sum(loans.filter(x => ['active', 'activo', 'overdue', 'atrasado'].includes(x.status)), 'amount');
   const investmentValue = sum(investments, ['currentValue', 'valorActual', 'capitalInvertido', 'invested']);
   const assetValue = sum(assets, ['value', 'valorActual', 'valorCompra']);
+  const financialState = await financeStateManager.getCurrentState({ force: true });
+  const financialMetrics = financialState.metrics || {};
 
   return {
     income: yearlyIncome,
     expense: yearlyExpense,
     net: yearlyIncome - yearlyExpense,
+    financialState,
+    financialMetrics,
+    liquidCapital: financialMetrics.liquidCapital || 0,
+    investedCapital: financialMetrics.investedCapital || 0,
+    patrimonio: financialMetrics.patrimonio || 0,
+    realProfit: financialMetrics.realProfit || 0,
+    cashFlow: financialMetrics.cashFlow || 0,
+    activePortfolio: financialMetrics.activePortfolio || loanActive,
+    projectedReturn: financialMetrics.projectedReturn || 0,
+    liabilities: financialMetrics.liabilities || 0,
+    reserves: financialMetrics.reserves || 0,
     allTimeIncome: sum(movements.filter(x => x.type === 'income'), 'amount'),
     allTimeExpense: sum(movements.filter(x => x.type === 'expense'), 'amount'),
     monthly,
@@ -214,7 +213,7 @@ function normalizeMovement(row) {
     ...row,
     type: row.type === 'ingreso' ? 'income' : row.type === 'egreso' ? 'expense' : row.type,
     category,
-    categoryLabel: row.categoryLabel || FINANCE_CATEGORY_LABELS[category] || category,
+    categoryLabel: row.categoryLabel || getFinanceCategoryLabel(category),
     amount: Number.isFinite(amount) ? amount : 0,
     date: row.date || row.fecha || row.timestamp || row.createdAt || new Date().toISOString(),
   };

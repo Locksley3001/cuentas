@@ -98,6 +98,7 @@ Object.entries(ASSET_CATEGORIES).forEach(([catKey, cat]) => {
     };
   });
 });
+const COMMERCIAL_ASSET_TYPES = new Set(['vacas', 'caballos', 'relojes', 'prendas', 'criptomonedas', 'inversiones']);
 
 /** Estados de un activo */
 export const ASSET_STATUS = {
@@ -1163,6 +1164,9 @@ export class AssetsModule {
       valorCompra,
       valorActual,
       fechaCompra,
+      financeConcept: COMMERCIAL_ASSET_TYPES.has(tipo) ? 'commercial_asset' : 'personal_asset',
+      capitalBucket: COMMERCIAL_ASSET_TYPES.has(tipo) ? 'commercial_asset' : 'personal_asset',
+      financialPurpose: COMMERCIAL_ASSET_TYPES.has(tipo) ? 'commercial' : 'personal',
       tasaDepreciacion: depreciacionPct > 0 ? (depreciacionPct / 100) : null,
       observaciones,
       updatedAt: new Date().toISOString(),

@@ -32,6 +32,16 @@ import {
 // ─── Import de storage (usa IndexedDB via db.js) ──────────────────────────────
 // Se importa dinámicamente para no romper si storage.js usa rutas distintas
 import * as Storage from '../storage/storage.js';
+import {
+  LEGACY_INCOME_CATEGORIES,
+  LEGACY_EXPENSE_CATEGORIES,
+  getDefaultLegacyCategory,
+  getFinanceCategory,
+  getFinanceCategoryDisplayName,
+  getFinanceCategoryIcon,
+  normalizeLegacyType,
+} from '../finance/categories.js';
+import { financeStateManager } from '../finance/finance-state-manager.js';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONSTANTES DE CONFIGURACIÓN
@@ -40,27 +50,9 @@ import * as Storage from '../storage/storage.js';
 /** Clave de la store en IndexedDB */
 const STORE_KEY = 'finance_movements';
 
-/** Categorías de INGRESOS */
-const INCOME_CATEGORIES = [
-  { value: 'ventas',      label: '🛒 Ventas',       icon: '🛒' },
-  { value: 'servicios',   label: '🔧 Servicios',     icon: '🔧' },
-  { value: 'intereses',   label: '📈 Intereses',     icon: '📈' },
-  { value: 'trading',     label: '📊 Trading',       icon: '📊' },
-  { value: 'inversiones', label: '💼 Inversiones',   icon: '💼' },
-  { value: 'otros_ing',   label: '💰 Otros ingresos', icon: '💰' },
-  { value: 'capital_inicial', label: '🌱 Capital inicial', icon: '🌱' },
-];
-
-/** Categorías de GASTOS */
-const EXPENSE_CATEGORIES = [
-  { value: 'publicidad',    label: '📣 Publicidad',    icon: '📣' },
-  { value: 'herramientas',  label: '🛠️ Herramientas',  icon: '🛠️' },
-  { value: 'servidores',    label: '🖥️ Servidores',    icon: '🖥️' },
-  { value: 'transporte',    label: '🚗 Transporte',    icon: '🚗' },
-  { value: 'alimentacion',  label: '🍽️ Alimentación',  icon: '🍽️' },
-  { value: 'mantenimiento', label: '🔩 Mantenimiento', icon: '🔩' },
-  { value: 'otros_gas',     label: '📦 Otros gastos',  icon: '📦' },
-];
+/** Categorias centralizadas: legacy + nueva arquitectura patrimonial. */
+const INCOME_CATEGORIES = LEGACY_INCOME_CATEGORIES;
+const EXPENSE_CATEGORIES = LEGACY_EXPENSE_CATEGORIES;
 
 /** Todas las categorías unidas */
 const ALL_CATEGORIES = [...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES];
@@ -117,6 +109,38 @@ const FINANCE_STYLES = `
     grid-template-columns: repeat(4, 1fr);
     gap: 1rem;
   }
+  .finance-capital-overview {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+  .finance-concept-card {
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+    min-width: 0;
+  }
+  .finance-concept-label {
+    color: var(--text-secondary, #8b94b3);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 0.35rem;
+  }
+  .finance-concept-value {
+    color: #e8e8f0;
+    font-size: 0.98rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .finance-concept-value.positive { color: #4ecdc4; }
+  .finance-concept-value.warning { color: #ffc857; }
+  .finance-concept-value.negative { color: #ff6b6b; }
   .stat-card {
     background: rgba(255,255,255,0.03);
     border: 1px solid rgba(255,255,255,0.07);
@@ -460,10 +484,12 @@ const FINANCE_STYLES = `
   /* ── Responsive ── */
   @media (max-width: 1024px) {
     .finance-stats { grid-template-columns: repeat(2, 1fr); }
+    .finance-capital-overview { grid-template-columns: repeat(3, 1fr); }
     .finance-grid-2 { grid-template-columns: 1fr; }
   }
   @media (max-width: 640px) {
     .finance-stats { grid-template-columns: 1fr 1fr; }
+    .finance-capital-overview { grid-template-columns: repeat(2, 1fr); }
     .finance-title { font-size: 1.15rem; }
     .stat-value    { font-size: 1.1rem; }
     .finance-tabs  { overflow-x: auto; padding: 0.7rem 0.75rem 0; }
@@ -516,16 +542,16 @@ function formatCurrencyFull(amount, currency = '$') {
 
 /** Obtiene etiqueta de categoría */
 function getCatLabel(value) {
-  return CATEGORY_MAP.get(value)?.label || value;
+  return getFinanceCategoryDisplayName(value);
 }
 
 /** Obtiene ícono de categoría */
 function getCatIcon(value) {
-  return CATEGORY_MAP.get(value)?.icon || '📌';
+  return getFinanceCategoryIcon(value);
 }
 
 function getCatDisplayName(value) {
-  return getCatLabel(value).replace(/^[^\s]+ /, '');
+  return getFinanceCategoryDisplayName(value);
 }
 
 function getUniqueCategoryOptions() {
@@ -616,19 +642,30 @@ const FinanceStorage = {
    * @returns {Promise<Object>}
    */
   async create(data) {
+    const type = normalizeLegacyType(data.type);
+    const category = data.category || getDefaultLegacyCategory(type);
+    const categoryDef = getFinanceCategory(category) || getFinanceCategory(getDefaultLegacyCategory(type));
     const movement = {
       id:          genId(),
       timestamp:   new Date().toISOString(),  // ← para history.js
       createdAt:   Date.now(),
       updatedAt:   Date.now(),
       // Campos del movimiento:
-      type:        data.type,       // 'income' | 'expense'
-      category:    data.category,
+      type,       // 'income' | 'expense'
+      category,
       amount:      parseFloat(data.amount) || 0,
       description: data.description || '',
       date:        data.date || new Date().toISOString().split('T')[0],
       reference:   data.reference || '',
-      categoryLabel: getCatDisplayName(data.category),
+      categoryLabel: getCatDisplayName(category),
+      financeConcept: data.financeConcept || categoryDef?.concept || null,
+      capitalBucket: data.capitalBucket || categoryDef?.bucket || null,
+      liquidImpact: data.liquidImpact,
+      investedImpact: data.investedImpact,
+      realProfitImpact: data.realProfitImpact,
+      cashFlowImpact: data.cashFlowImpact,
+      sourceModule: data.sourceModule || data.source || 'finance',
+      meta:        data.meta || {},
       tags:        data.tags || [],
       // Metadatos para history.js:
       _historyAction: 'create',
@@ -639,6 +676,7 @@ const FinanceStorage = {
       await Storage.save(STORE_KEY, movement);
       // Preparación: cuando exista history.js se llamará aquí
       FinanceStorage._logHistory('CREATE', movement);
+      financeStateManager.invalidate('finance:movement_created');
       return movement;
     } catch (e) {
       console.error('[Finance] Error creando movimiento:', e);
@@ -667,6 +705,7 @@ const FinanceStorage = {
     try {
       await Storage.save(STORE_KEY, updated);
       FinanceStorage._logHistory('UPDATE', updated);
+      financeStateManager.invalidate('finance:movement_updated');
       return updated;
     } catch (e) {
       console.error('[Finance] Error actualizando movimiento:', e);
@@ -684,6 +723,7 @@ const FinanceStorage = {
       const existing = await FinanceStorage.getById(id);
       await Storage.remove(STORE_KEY, id);
       if (existing) FinanceStorage._logHistory('DELETE', existing);
+      financeStateManager.invalidate('finance:movement_deleted');
     } catch (e) {
       console.error('[Finance] Error eliminando movimiento:', e);
       throw e;
@@ -736,6 +776,7 @@ class FinanceModule {
     this._dateFrom      = null;      // filtro fecha desde
     this._dateTo        = null;      // filtro fecha hasta
     this._container     = null;
+    this._financialState = null;
   }
 
   // ─── INIT ─────────────────────────────────────────────────────────────────
@@ -776,9 +817,11 @@ class FinanceModule {
         new Date(b.date + 'T' + (b.timestamp?.slice(11) || '00:00:00'))
         - new Date(a.date + 'T' + (a.timestamp?.slice(11) || '00:00:00'))
       );
+      this._financialState = await financeStateManager.getCurrentState({ force: true });
     } catch (e) {
       console.error('[Finance] Error cargando datos:', e);
       this._movements = [];
+      this._financialState = null;
     }
     this._applyDateFilter();
   }
@@ -861,6 +904,7 @@ class FinanceModule {
 
         <!-- Stats cards -->
         <div class="finance-stats" id="finance-stats"></div>
+        <div class="finance-capital-overview" id="finance-capital-overview"></div>
 
         <!-- Grid: gráficos + resumen -->
         <div class="finance-grid-2">
@@ -914,6 +958,7 @@ class FinanceModule {
 
     // Renderizar secciones de datos
     this._renderStats();
+    this._renderCapitalOverview();
     this._renderChart();
     this._renderCashflow();
     this._renderCategories();
@@ -984,6 +1029,7 @@ class FinanceModule {
   // ─── REFRESH COMPLETO ─────────────────────────────────────────────────────
   _refreshAll() {
     this._renderStats();
+    this._renderCapitalOverview();
     this._renderChart();
     this._renderCashflow();
     this._renderCategories();
@@ -1050,6 +1096,28 @@ class FinanceModule {
           <div class="stat-value ${c.valueCls}">${c.value}</div>
           <div class="stat-change">${c.sub}</div>
         </div>
+      </div>
+    `).join('');
+  }
+
+  _renderCapitalOverview() {
+    const el = document.getElementById('finance-capital-overview');
+    if (!el) return;
+
+    const metrics = this._financialState?.metrics || {};
+    const cards = [
+      { label: 'Capital liquido', value: metrics.liquidCapital, cls: metrics.liquidCapital >= 0 ? 'positive' : 'negative' },
+      { label: 'Capital invertido', value: metrics.investedCapital, cls: 'warning' },
+      { label: 'Patrimonio', value: metrics.patrimonio, cls: metrics.patrimonio >= 0 ? 'positive' : 'negative' },
+      { label: 'Utilidad real', value: metrics.realProfit, cls: metrics.realProfit >= 0 ? 'positive' : 'negative' },
+      { label: 'Cartera activa', value: metrics.activePortfolio, cls: 'warning' },
+      { label: 'Retorno proyectado', value: metrics.projectedReturn, cls: 'positive' },
+    ];
+
+    el.innerHTML = cards.map(card => `
+      <div class="finance-concept-card">
+        <div class="finance-concept-label">${card.label}</div>
+        <div class="finance-concept-value ${card.cls}">${formatCurrency(Math.abs(card.value || 0))}</div>
       </div>
     `).join('');
   }
@@ -1442,6 +1510,7 @@ class FinanceModule {
 
       closeModal();
       this._applyDateFilter();
+      this._financialState = await financeStateManager.getCurrentState({ force: true });
       this._refreshAll();
 
     } catch (e) {
@@ -1468,6 +1537,7 @@ class FinanceModule {
           this._movements = this._movements.filter(m => m.id !== row.id);
           this._table?.removeRow(row.id);
           this._applyDateFilter();
+          this._financialState = await financeStateManager.getCurrentState({ force: true });
           this._refreshAll();
           showToast('Movimiento eliminado', 'warning');
         } catch (e) {
@@ -1515,6 +1585,7 @@ class FinanceModule {
   /** Recarga datos desde IndexedDB y refresca la UI */
   async refresh() {
     await this._loadData();
+    this._financialState = await financeStateManager.getCurrentState({ force: true });
     this._refreshAll();
   }
 
@@ -1557,15 +1628,24 @@ export async function initFinance(container) {
 }
 
 export async function registerTransaction(data) {
-  const rawType = data.type || 'income';
-  const type = rawType === 'ingreso' ? 'income' : rawType === 'egreso' ? 'expense' : rawType;
+  const type = normalizeLegacyType(data.type || 'income');
+  const category = data.category || getDefaultLegacyCategory(type);
   return FinanceStorage.create({
     type,
     amount: Number(data.amount || 0),
-    category: data.category || 'otros_ing',
+    category,
     description: data.description || data.desc || data.note || 'Movimiento',
     date: data.date || new Date().toISOString().split('T')[0],
     reference: data.reference || data.source || '',
+    sourceModule: data.sourceModule || data.source || 'integration',
+    financeConcept: data.financeConcept,
+    capitalBucket: data.capitalBucket,
+    liquidImpact: data.liquidImpact,
+    investedImpact: data.investedImpact,
+    realProfitImpact: data.realProfitImpact,
+    cashFlowImpact: data.cashFlowImpact,
+    meta: data.meta || {},
+    tags: data.tags || [],
   });
 }
 

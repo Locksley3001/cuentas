@@ -11,7 +11,7 @@ const APP_CONFIG = {
   /* ── Configuración de almacenamiento ─────────────────────── */
   db: {
     name:    'cuentasDB',
-    version: 10,
+    version: 11,
     /* Stores que se crearán en IndexedDB */
     stores: {
       transactions: { keyPath: 'id', autoIncrement: true },
@@ -31,6 +31,10 @@ const APP_CONFIG = {
       assets:       { keyPath: 'id', autoIncrement: true },
       asset_history:{ keyPath: 'id', autoIncrement: true },
       asset_value_history:{ keyPath: 'id', autoIncrement: true },
+      financial_accounts: { keyPath: 'id', autoIncrement: true },
+      financial_categories: { keyPath: 'value' },
+      financial_state_snapshots: { keyPath: 'id', autoIncrement: true },
+      liabilities:   { keyPath: 'id', autoIncrement: true },
       businesses:   { keyPath: 'id', autoIncrement: true },
       history:      { keyPath: 'id', autoIncrement: true },
       settings:     { keyPath: 'key' },

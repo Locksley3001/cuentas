@@ -13,6 +13,7 @@ import { DashboardModule } from './modules/dashboard.js';
 import { setupGlobalIntegrations } from './modules/integrations.js';
 import { HistoryModule, initHistory } from './modules/history.js';
 import { initSettings, SettingsModule } from './modules/settings.js';
+import { financeStateManager } from './finance/finance-state-manager.js';
 
 const pageContent = () => document.getElementById('page-content');
 
@@ -21,6 +22,7 @@ async function initApp() {
 
   try {
     await DB.init();
+    await financeStateManager.init();
     await Storage.cleanupDemoData();
 
     Sidebar.init();
