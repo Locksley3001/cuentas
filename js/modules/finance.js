@@ -40,6 +40,7 @@ import {
   getFinanceCategoryDisplayName,
   getFinanceCategoryIcon,
   normalizeLegacyType,
+  classifyFinancialMovement,
 } from '../finance/categories.js';
 import { financeStateManager } from '../finance/finance-state-manager.js';
 
@@ -558,6 +559,36 @@ function getUniqueCategoryOptions() {
   return Array.from(CATEGORY_MAP.values()).map(c => ({ value: c.value, label: c.label }));
 }
 
+function getMovementNatureLabel(row) {
+  if (row.realIncomeImpact > 0) return 'Ingreso real';
+  if (row.realExpenseImpact > 0) return 'Gasto real';
+  if (row.isInternalMovement) return 'Movimiento interno';
+  if (row.isCapitalMovement) return 'Capital';
+  return row.type === 'income' ? 'Ingreso' : 'Gasto';
+}
+
+function getMovementNatureTone(row) {
+  if (row.realIncomeImpact > 0) return 'success';
+  if (row.realExpenseImpact > 0) return 'danger';
+  if (row.isInternalMovement) return 'info';
+  if (row.isCapitalMovement) return 'warning';
+  return row.type === 'income' ? 'success' : 'danger';
+}
+
+function renderImpactSummary(row) {
+  const impacts = row.impactSummary?.rows || [];
+  if (!impacts.length) return '<span style="color:#555;">—</span>';
+  return `
+    <div style="display:flex;flex-wrap:wrap;gap:0.25rem;">
+      ${impacts.slice(0, 4).map(item => `
+        <span class="dt-badge badge-${item.tone === 'positive' ? 'success' : 'danger'}" title="${item.label}">
+          ${item.direction} ${item.label}
+        </span>
+      `).join('')}
+    </div>
+  `;
+}
+
 /** Inicio y fin del periodo seleccionado */
 function getPeriodRange(period) {
   const now   = new Date();
@@ -671,13 +702,14 @@ const FinanceStorage = {
       _historyAction: 'create',
       _historyModule: 'finance',
     };
+    const classifiedMovement = classifyFinancialMovement(movement);
 
     try {
-      await Storage.save(STORE_KEY, movement);
+      await Storage.save(STORE_KEY, classifiedMovement);
       // Preparación: cuando exista history.js se llamará aquí
-      FinanceStorage._logHistory('CREATE', movement);
+      FinanceStorage._logHistory('CREATE', classifiedMovement);
       financeStateManager.invalidate('finance:movement_created');
-      return movement;
+      return classifiedMovement;
     } catch (e) {
       console.error('[Finance] Error creando movimiento:', e);
       throw e;
@@ -749,6 +781,18 @@ const FinanceStorage = {
       amount:      movement.amount,
       type:        movement.type,
       description: movement.description,
+      financeConcept: movement.financeConcept,
+      capitalBucket: movement.capitalBucket,
+      impactSummary: movement.impactSummary,
+      impacts: {
+        liquidity: movement.liquidImpact || 0,
+        investedCapital: movement.investedImpact || 0,
+        activePortfolio: movement.activePortfolioImpact || 0,
+        personalAssets: movement.personalAssetImpact || 0,
+        commercialAssets: movement.commercialAssetImpact || 0,
+        reserves: movement.reserveImpact || 0,
+        realProfit: movement.realProfitImpact || 0,
+      },
     };
 
     if (typeof window._historyModule?.log === 'function') {
@@ -808,7 +852,7 @@ class FinanceModule {
   // ─── CARGA DE DATOS ───────────────────────────────────────────────────────
   async _loadData() {
     try {
-      this._movements = (await FinanceStorage.getAll()).map(m => ({
+      this._movements = (await FinanceStorage.getAll()).map(m => classifyFinancialMovement({
         ...m,
         categoryLabel: m.categoryLabel || getCatDisplayName(m.category),
       }));
@@ -1040,40 +1084,43 @@ class FinanceModule {
   // ESTADÍSTICAS
   // ═══════════════════════════════════════════════════════════════════════════
   _getStats(data = this._filtered) {
-    const income  = data.filter(m => m.type === 'income').reduce((s, m)  => s + m.amount, 0);
-    const expense = data.filter(m => m.type === 'expense').reduce((s, m) => s + m.amount, 0);
+    const income  = data.reduce((s, m) => s + (m.realIncomeImpact || 0), 0);
+    const expense = data.reduce((s, m) => s + (m.realExpenseImpact || 0), 0);
+    const capitalMovements = data
+      .filter(m => m.isCapitalMovement)
+      .reduce((s, m) => s + m.amount, 0);
     const balance = income - expense;
     const count   = data.length;
-    return { income, expense, balance, count };
+    return { income, expense, balance, count, capitalMovements };
   }
 
   _renderStats() {
     const el = document.getElementById('finance-stats');
     if (!el) return;
 
-    const { income, expense, balance, count } = this._getStats();
+    const { income, expense, balance, count, capitalMovements } = this._getStats();
 
     const cards = [
       {
         icon: '💰',
         iconCls: 'green',
-        label: 'Total Ingresos',
+        label: 'Ingresos reales',
         value: formatCurrency(income),
         valueCls: 'positive',
-        sub: `${this._filtered.filter(m => m.type === 'income').length} movimientos`,
+        sub: 'utilidad cobrada',
       },
       {
         icon: '📉',
         iconCls: 'red',
-        label: 'Total Gastos',
+        label: 'Gastos reales',
         value: formatCurrency(expense),
         valueCls: 'negative',
-        sub: `${this._filtered.filter(m => m.type === 'expense').length} movimientos`,
+        sub: 'salidas operativas',
       },
       {
         icon: '⚖️',
         iconCls: 'blue',
-        label: 'Balance Neto',
+        label: 'Utilidad neta',
         value: formatCurrency(Math.abs(balance)),
         valueCls: balance >= 0 ? 'positive' : 'negative',
         sub: balance >= 0 ? '▲ Superávit' : '▼ Déficit',
@@ -1081,10 +1128,10 @@ class FinanceModule {
       {
         icon: '📋',
         iconCls: 'yellow',
-        label: 'Movimientos',
-        value: count.toString(),
+        label: 'Capital movido',
+        value: formatCurrency(capitalMovements),
         valueCls: '',
-        sub: 'en el período',
+        sub: `${count} registros`,
       },
     ];
 
@@ -1144,8 +1191,8 @@ class FinanceModule {
       });
       return {
         label,
-        income:  movs.filter(mv => mv.type === 'income').reduce((s, mv)  => s + mv.amount, 0),
-        expense: movs.filter(mv => mv.type === 'expense').reduce((s, mv) => s + mv.amount, 0),
+        income: movs.reduce((s, mv) => s + (mv.realIncomeImpact || 0), 0),
+        expense: movs.reduce((s, mv) => s + (mv.realExpenseImpact || 0), 0),
       };
     });
 
@@ -1158,11 +1205,11 @@ class FinanceModule {
         <div class="chart-bar-wrap" style="position:relative;">
           <div class="chart-bar income-bar"
             style="height:${incH}px;"
-            data-tooltip="Ing: ${formatCurrency(g.income)}">
+            data-tooltip="Ing real: ${formatCurrency(g.income)}">
           </div>
           <div class="chart-bar expense-bar"
             style="height:${expH}px;margin-top:2px;"
-            data-tooltip="Gas: ${formatCurrency(g.expense)}">
+            data-tooltip="Gas real: ${formatCurrency(g.expense)}">
           </div>
           <span class="chart-label">${g.label}</span>
         </div>
@@ -1171,8 +1218,8 @@ class FinanceModule {
 
     el.innerHTML = `
       <div class="chart-legend">
-        <span><span class="chart-legend-dot" style="background:#4ecdc4;"></span>Ingresos</span>
-        <span><span class="chart-legend-dot" style="background:#ff6b6b;"></span>Gastos</span>
+        <span><span class="chart-legend-dot" style="background:#4ecdc4;"></span>Ingresos reales</span>
+        <span><span class="chart-legend-dot" style="background:#ff6b6b;"></span>Gastos reales</span>
       </div>
       <div class="chart-bars">${barsHTML}</div>
     `;
@@ -1189,11 +1236,11 @@ class FinanceModule {
     const margin = income > 0 ? ((income - expense) / income * 100) : 0;
 
     const rows = [
-      { label: '💰 Ingresos totales', val: formatCurrencyFull(income), cls: 'positive' },
-      { label: '📉 Gastos totales',   val: `– ${formatCurrencyFull(expense)}`, cls: 'negative' },
-      { label: '⚖️ Balance neto',     val: (balance >= 0 ? '+ ' : '– ') + formatCurrencyFull(Math.abs(balance)),
+      { label: '💰 Ingresos reales', val: formatCurrencyFull(income), cls: 'positive' },
+      { label: '📉 Gastos reales',   val: `– ${formatCurrencyFull(expense)}`, cls: 'negative' },
+      { label: '⚖️ Utilidad neta',     val: (balance >= 0 ? '+ ' : '– ') + formatCurrencyFull(Math.abs(balance)),
         cls: balance >= 0 ? 'positive' : 'negative' },
-      { label: '📊 Margen de utilidad', val: `${margin.toFixed(1)}%`,
+      { label: '📊 Rentabilidad sobre ingresos', val: `${margin.toFixed(1)}%`,
         cls: margin >= 0 ? 'positive' : 'negative' },
       { label: '🔢 Total movimientos', val: String(this._filtered.length), cls: '' },
     ];
@@ -1221,13 +1268,14 @@ class FinanceModule {
     const el = document.getElementById(elId);
     if (!el) return;
 
-    const movs = this._filtered.filter(m => m.type === type);
-    const total = movs.reduce((s, m) => s + m.amount, 0);
+    const valueKey = type === 'income' ? 'realIncomeImpact' : 'realExpenseImpact';
+    const movs = this._filtered.filter(m => (m[valueKey] || 0) > 0);
+    const total = movs.reduce((s, m) => s + (m[valueKey] || 0), 0);
 
     // Sumar por categoría
     const catTotals = cats.map(cat => ({
       ...cat,
-      total: movs.filter(m => m.category === cat.value).reduce((s, m) => s + m.amount, 0),
+      total: movs.filter(m => m.category === cat.value).reduce((s, m) => s + (m[valueKey] || 0), 0),
     })).filter(c => c.total > 0).sort((a, b) => b.total - a.total);
 
     if (catTotals.length === 0) {
@@ -1282,9 +1330,9 @@ class FinanceModule {
           key: 'type',
           label: 'Tipo',
           width: '90px',
-          render: (val) => renderBadge(
-            val === 'income' ? 'Ingreso' : 'Gasto',
-            val === 'income' ? 'success' : 'danger'
+          render: (val, row) => renderBadge(
+            getMovementNatureLabel(row),
+            getMovementNatureTone(row)
           ),
         },
         {
@@ -1303,6 +1351,11 @@ class FinanceModule {
           key: 'description',
           label: 'Descripción',
           render: (val) => `<span style="color:#999;">${val || '—'}</span>`,
+        },
+        {
+          key: 'impactSummary',
+          label: 'Impacto',
+          render: (val, row) => renderImpactSummary(row),
         },
         {
           key: 'amount',

@@ -27,6 +27,13 @@ const DashboardModule = (() => {
     return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
+  function formatMonthKey(key) {
+    if (!key || !String(key).includes('-')) return '-';
+    const [, month] = String(key).split('-');
+    const index = Math.max(0, Math.min(11, Number(month) - 1));
+    return APP_CONFIG.months[index] || key;
+  }
+
   async function render() {
     const container = document.getElementById('page-content');
     if (!container) return;
@@ -40,20 +47,30 @@ const DashboardModule = (() => {
       getGlobalDashboardData(),
     ]);
 
-    const monthly = globalData.monthly || Array.from({ length: 12 }, () => ({ income: 0, expense: 0 }));
+    const financialState = globalData.financialState || {};
+    const fm = globalData.financialMetrics || {};
+    const monthly = normalizeMonthly(globalData.monthly || financialState.monthly || []);
     const recentMovements = globalData.recentMovements || [];
     const alerts = globalData.alerts || [];
     const history = globalData.history || [];
     const income = Number(globalData.income) || 0;
     const expense = Number(globalData.expense) || 0;
     const profit = income - expense;
-    const fm = globalData.financialMetrics || {};
     const patrimonio = Number(fm.patrimonio ?? globalData.patrimonio ?? 0);
     const liquidCapital = Number(fm.liquidCapital ?? globalData.liquidCapital ?? 0);
     const investedCapital = Number(fm.investedCapital ?? globalData.investedCapital ?? 0);
     const realProfit = Number(fm.realProfit ?? globalData.realProfit ?? profit);
     const activePortfolio = Number(fm.activePortfolio ?? globalData.activePortfolio ?? loanSummary.active);
     const projectedReturn = Number(fm.projectedReturn ?? globalData.projectedReturn ?? 0);
+    const productiveCapital = Number(fm.productiveCapital ?? 0);
+    const liquidityAvailable = Number(fm.liquidityAvailable ?? liquidCapital);
+    const roi = Number(fm.roi ?? 0);
+    const monthlyYieldRate = Number(fm.monthlyYieldRate ?? 0);
+    const patrimonioGrowth = Number(fm.patrimonioGrowth ?? 0);
+    const capitalInvestedPct = Number(fm.capitalInvestedPct ?? 0);
+    const portfolioReturn = Number(fm.portfolioReturn ?? 0);
+    const capitalGrowth = Number(fm.capitalGrowth ?? 0);
+    const composition = financialState.composition || {};
     const investmentValue = Number(portfolio.current) || 0;
     const capital = investmentValue + (Number(assetValue) || 0);
 
@@ -82,7 +99,14 @@ const DashboardModule = (() => {
         <div class="quick-stats">
           ${Cards.quickStat({ label: 'Cartera activa', value: fmt(activePortfolio), color: 'warning' })}
           ${Cards.quickStat({ label: 'Retorno proyectado', value: fmt(projectedReturn), color: 'accent' })}
-          ${Cards.quickStat({ label: 'Activos', value: fmt(assetValue), color: 'accent-2' })}
+          ${Cards.quickStat({ label: 'Liquidez disponible', value: fmtSigned(liquidityAvailable), color: 'accent-2' })}
+        </div>
+
+        <div class="finance-indicators-grid">
+          ${_renderIndicator('ROI', fmtPct(roi), 'Utilidad real sobre capital productivo', roi >= 0 ? 'positive' : 'negative')}
+          ${_renderIndicator('Rendimiento mensual', fmtPct(monthlyYieldRate), 'Utilidad real del mes sobre capital', monthlyYieldRate >= 0 ? 'positive' : 'negative')}
+          ${_renderIndicator('Capital invertido', fmtPct(capitalInvestedPct), 'Porcentaje del capital en produccion', 'neutral')}
+          ${_renderIndicator('Crecimiento patrimonial', fmtPct(patrimonioGrowth), 'Evolucion del patrimonio registrado', patrimonioGrowth >= 0 ? 'positive' : 'negative')}
         </div>
 
         <div class="dashboard-grid">
@@ -92,8 +116,8 @@ const DashboardModule = (() => {
             content: `
               ${_renderBarChart(monthly)}
               <div class="chart-legend">
-                <div class="legend-item"><div class="legend-dot" style="background:var(--success)"></div>Ingresos</div>
-                <div class="legend-item"><div class="legend-dot" style="background:var(--danger)"></div>Gastos</div>
+                <div class="legend-item"><div class="legend-dot" style="background:var(--success)"></div>Ingresos reales</div>
+                <div class="legend-item"><div class="legend-dot" style="background:var(--danger)"></div>Gastos reales</div>
               </div>
               <div class="divider"></div>
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-md);text-align:center">
@@ -122,13 +146,33 @@ const DashboardModule = (() => {
 
             ${Cards.panel({
               title: 'Composición',
-              content: _renderCapitalComposition({ investmentValue, assetValue, loanActive: loanSummary.active, capital }),
+              content: _renderCapitalComposition(composition, { investmentValue, assetValue, loanActive: loanSummary.active, capital }),
               footer: `
                 <span style="font-size:0.78rem;color:var(--text-muted)">Capital real</span>
-                <span style="font-family:var(--font-mono);font-size:0.875rem;color:var(--accent)">${fmt(capital)}</span>
+                <span style="font-family:var(--font-mono);font-size:0.875rem;color:var(--accent)">${fmt(Number(fm.totalCapitalBase ?? capital))}</span>
               `,
             })}
           </div>
+        </div>
+
+        <div class="dashboard-grid mt-lg">
+          ${Cards.panel({
+            title: 'Evolucion patrimonial',
+            dot: true,
+            content: _renderPatrimonialEvolution(monthly),
+          })}
+
+          ${Cards.panel({
+            title: 'Metricas cartera',
+            content: _renderPortfolioMetrics({
+              activePortfolio,
+              projectedReturn,
+              portfolioReturn,
+              productiveCapital,
+              capitalInvestedPct,
+              capitalGrowth,
+            }),
+          })}
         </div>
 
         <div class="dashboard-grid mt-lg">
@@ -153,6 +197,41 @@ const DashboardModule = (() => {
     _animateBars();
   }
 
+  function normalizeMonthly(rows) {
+    const source = Array.isArray(rows) && rows.length
+      ? rows
+      : Array.from({ length: 12 }, (_, index) => ({
+        key: `${new Date().getFullYear()}-${String(index + 1).padStart(2, '0')}`,
+        income: 0,
+        expense: 0,
+      }));
+
+    return source.map(row => ({
+      ...row,
+      income: Number(row.income ?? row.realIncome ?? 0),
+      expense: Number(row.expense ?? row.realExpense ?? 0),
+      realProfit: Number(row.realProfit ?? 0),
+      patrimonio: Number(row.patrimonio ?? 0),
+      capitalBase: Number(row.capitalBase ?? 0),
+      yieldRate: Number(row.yieldRate ?? 0),
+    }));
+  }
+
+  function fmtPct(value) {
+    const number = Number(value) || 0;
+    return `${number.toFixed(1)}%`;
+  }
+
+  function _renderIndicator(label, value, detail, tone = 'neutral') {
+    return `
+      <div class="finance-indicator ${tone}">
+        <div class="finance-indicator-label">${escapeHtml(label)}</div>
+        <div class="finance-indicator-value">${escapeHtml(value)}</div>
+        <div class="finance-indicator-detail">${escapeHtml(detail)}</div>
+      </div>
+    `;
+  }
+
   function _renderAlerts(alerts) {
     if (!alerts.length) {
       return `<div class="empty-state"><div class="empty-icon">✓</div><p>Sin alertas con los datos actuales</p></div>`;
@@ -170,14 +249,21 @@ const DashboardModule = (() => {
     `;
   }
 
-  function _renderCapitalComposition({ investmentValue, assetValue, loanActive, capital }) {
-    const max = Math.max(capital, investmentValue, assetValue, loanActive, 1);
-    const rows = [
-      { label: 'Inversiones', value: investmentValue, color: 'accent' },
-      { label: 'Activos', value: assetValue, color: 'success' },
-      { label: 'Préstamos activos', value: loanActive, color: 'warning' },
-    ].filter(row => row.value > 0);
-
+  function _renderCapitalComposition(composition = {}, fallback = {}) {
+    const fallbackRows = [
+      { label: 'Inversiones', value: fallback.investmentValue, color: 'accent' },
+      { label: 'Activos', value: fallback.assetValue, color: 'success' },
+      { label: 'Prestamos activos', value: fallback.loanActive, color: 'warning' },
+    ];
+    const sourceRows = composition.rows?.length ? composition.rows : fallbackRows;
+    const rows = sourceRows
+      .map((row, index) => ({
+        label: row.label,
+        value: Number(row.value) || 0,
+        color: row.color || ['accent', 'success', 'warning', 'accent-2'][index % 4],
+      }))
+      .filter(row => row.value > 0);
+    const max = Math.max(Number(composition.total ?? fallback.capital ?? 0), ...rows.map(row => row.value), 1);
     if (!rows.length) {
       return `<div class="empty-state"><div class="empty-icon">○</div><p>Sin capital registrado todavía</p></div>`;
     }
@@ -190,21 +276,103 @@ const DashboardModule = (() => {
     })).join('');
   }
 
+  function _renderPatrimonialEvolution(monthlyData) {
+    const rows = monthlyData.filter(row => row.patrimonio || row.capitalBase || row.realProfit).slice(-6);
+    if (!rows.length) {
+      return `<div class="empty-state"><div class="empty-icon">â—‹</div><p>Sin evolucion patrimonial suficiente</p></div>`;
+    }
+
+    const max = Math.max(...rows.map(row => Math.abs(row.patrimonio || row.capitalBase || 0)), 1);
+    return `
+      <div class="patrimonial-evolution">
+        ${rows.map(row => {
+          const value = Number(row.patrimonio || row.capitalBase || 0);
+          const width = Math.max(4, Math.round((Math.abs(value) / max) * 100));
+          return `
+            <div class="evolution-row">
+              <div class="evolution-month">${escapeHtml(formatMonthKey(row.key))}</div>
+              <div class="evolution-track"><span style="width:${width}%"></span></div>
+              <div class="evolution-value">${fmtSigned(value)}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function _renderPortfolioMetrics(values) {
+    const rows = [
+      { label: 'Cartera activa', value: fmt(values.activePortfolio), tone: 'warning' },
+      { label: 'Retorno proyectado', value: fmt(values.projectedReturn), tone: 'positive' },
+      { label: 'Retorno cartera', value: fmtPct(values.portfolioReturn), tone: values.portfolioReturn >= 0 ? 'positive' : 'negative' },
+      { label: 'Capital productivo', value: fmt(values.productiveCapital), tone: 'neutral' },
+      { label: 'Capital invertido', value: fmtPct(values.capitalInvestedPct), tone: 'neutral' },
+      { label: 'Crecimiento capital', value: fmtPct(values.capitalGrowth), tone: values.capitalGrowth >= 0 ? 'positive' : 'negative' },
+    ];
+
+    return `
+      <div class="portfolio-metrics-list">
+        ${rows.map(row => `
+          <div class="portfolio-metric-row ${row.tone}">
+            <span>${escapeHtml(row.label)}</span>
+            <strong>${escapeHtml(row.value)}</strong>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
   function _renderRecentMovements(movements) {
     if (!movements.length) {
       return `<div class="empty-state"><div class="empty-icon">○</div><p>Sin movimientos reales aún</p></div>`;
     }
 
     return `
-      <div class="tx-list">
-        ${movements.map(tx => Cards.txItem({
-          icon: tx.type === 'income' ? '▲' : '▼',
-          iconBg: tx.type === 'income' ? 'var(--success-soft)' : 'var(--danger-soft)',
-          name: tx.description || tx.categoryLabel || tx.category || 'Movimiento',
-          date: fmtDate(tx.date),
-          amount: fmt(tx.amount),
-          positive: tx.type === 'income',
-        })).join('')}
+      <div class="financial-movement-list">
+        ${movements.map(tx => {
+          const nature = getMovementNature(tx);
+          return `
+            <div class="financial-movement-item ${nature.tone}">
+              <div class="movement-main">
+                <div class="movement-icon">${nature.icon}</div>
+                <div>
+                  <div class="movement-name">${escapeHtml(tx.description || tx.categoryLabel || tx.category || 'Movimiento')}</div>
+                  <div class="movement-date">${fmtDate(tx.date)} · ${escapeHtml(nature.label)}</div>
+                  ${renderImpactLine(tx)}
+                </div>
+              </div>
+              <div class="movement-amount">${fmtSigned(getMovementDisplayAmount(tx))}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function getMovementNature(tx) {
+    if ((tx.realIncomeImpact || 0) > 0) return { label: 'Ingreso real', icon: '▲', tone: 'positive' };
+    if ((tx.realExpenseImpact || 0) > 0) return { label: 'Gasto real', icon: '▼', tone: 'negative' };
+    if (tx.isInternalMovement) return { label: 'Movimiento interno', icon: '↔', tone: 'neutral' };
+    if (tx.isCapitalMovement) return { label: 'Capital', icon: '◆', tone: 'capital' };
+    return tx.type === 'income'
+      ? { label: 'Entrada', icon: '▲', tone: 'positive' }
+      : { label: 'Salida', icon: '▼', tone: 'negative' };
+  }
+
+  function getMovementDisplayAmount(tx) {
+    if ((tx.realIncomeImpact || 0) > 0) return tx.realIncomeImpact;
+    if ((tx.realExpenseImpact || 0) > 0) return -tx.realExpenseImpact;
+    if ((tx.liquidImpact || 0) !== 0) return tx.liquidImpact;
+    return tx.type === 'expense' ? -tx.amount : tx.amount;
+  }
+
+  function renderImpactLine(tx) {
+    const source = Array.isArray(tx.impactSummary) ? tx.impactSummary : tx.impactSummary?.rows;
+    const items = Array.isArray(source) ? source.slice(0, 3) : [];
+    if (!items.length) return '';
+    return `
+      <div class="movement-impact">
+        ${items.map(item => `<span>${escapeHtml(item.text || `${item.direction || ''} ${item.label || ''}`)}</span>`).join('')}
       </div>
     `;
   }
@@ -219,30 +387,33 @@ const DashboardModule = (() => {
       <div class="timeline">
         ${realHistory.map(item => Cards.timelineItem({
           time: fmtDate(item.timestamp || item.date),
-          text: `<strong>${escapeHtml(item.action || item.category || 'Actividad')}</strong> ${escapeHtml(item.description || '')}`,
+          text: `<strong>${escapeHtml(item.action || item.category || 'Actividad')}</strong> ${escapeHtml(item.description || '')}${renderHistoryImpact(item)}`,
         })).join('')}
       </div>
     `;
   }
 
-  function _renderBarChart(monthlyData) {
-    const maxVal = monthlyData.reduce((m, d) => Math.max(m, d.income || 0, d.expense || 0), 1);
-    const months = APP_CONFIG.months;
-    const currentMonth = new Date().getMonth();
-    const indices = [];
-    for (let i = 5; i >= 0; i--) indices.push((currentMonth - i + 12) % 12);
+  function renderHistoryImpact(item) {
+    const source = Array.isArray(item.impactSummary) ? item.impactSummary : item.impactSummary?.rows;
+    const rows = Array.isArray(source) ? source.slice(0, 3) : [];
+    if (!rows.length) return '';
+    return `<div class="movement-impact">${rows.map(row => `<span>${escapeHtml(row.text || `${row.direction || ''} ${row.label || ''}`)}</span>`).join('')}</div>`;
+  }
 
-    const barsHTML = indices.map(i => {
-      const data = monthlyData[i] || { income: 0, expense: 0 };
+  function _renderBarChart(monthlyData) {
+    const rows = monthlyData.slice(-6);
+    const maxVal = rows.reduce((m, d) => Math.max(m, d.income || 0, d.expense || 0), 1);
+
+    const barsHTML = rows.map(data => {
       const incH = Math.max(4, Math.round(((data.income || 0) / maxVal) * 120));
       const expH = Math.max(4, Math.round(((data.expense || 0) / maxVal) * 120));
       return `
         <div class="bar-group">
           <div class="bar-wrap">
-            <div class="bar income" data-h="${incH}" style="height:4px" title="Ingreso: ${fmt(data.income)}"></div>
-            <div class="bar expense" data-h="${expH}" style="height:4px" title="Gasto: ${fmt(data.expense)}"></div>
+            <div class="bar income" data-h="${incH}" style="height:4px" title="Ingreso real: ${fmt(data.income)}"></div>
+            <div class="bar expense" data-h="${expH}" style="height:4px" title="Gasto real: ${fmt(data.expense)}"></div>
           </div>
-          <div class="bar-label">${months[i]}</div>
+          <div class="bar-label">${formatMonthKey(data.key)}</div>
         </div>
       `;
     }).join('');

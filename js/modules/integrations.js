@@ -3,8 +3,9 @@ import { showToast } from '../components/modal.js';
 import { HistoryModule } from './history.js';
 import { Investments } from './investments.js';
 import { Assets } from './assets.js';
-import { getFinanceCategoryLabel } from '../finance/categories.js';
+import { classifyFinancialMovement, getFinanceCategoryLabel } from '../finance/categories.js';
 import { financeStateManager } from '../finance/finance-state-manager.js';
+import { financialReportsService } from '../finance/financial-reports-service.js';
 
 let initialized = false;
 
@@ -55,6 +56,8 @@ async function handleFinanceUpdate(event) {
     amount: pickAmount(data),
     status: data.estado || data.status || 'ok',
     entityId: data.id,
+    impactSummary: data.impactSummary || null,
+    impacts: data.impacts || null,
   });
 
   financeStateManager.invalidate(`${source}:${eventType}`);
@@ -157,24 +160,24 @@ export async function getGlobalDashboardData() {
     safeAll('history'),
   ]);
 
-  const income = sum([...transactions, ...financeMovements].filter(x => x.type === 'income'), 'amount');
-  const expense = sum([...transactions, ...financeMovements].filter(x => x.type === 'expense'), 'amount');
   const currentYear = new Date().getFullYear();
   const movements = [...transactions, ...financeMovements]
     .filter(isRealMovement)
-    .map(normalizeMovement);
+    .map(row => classifyFinancialMovement(normalizeMovement(row)));
+  const financialState = await financeStateManager.getCurrentState({ force: true });
+  const financialMetrics = financialState.metrics || {};
+  const reports = await financialReportsService.getReports(financialState);
   const yearMovements = movements.filter(m => new Date(m.date).getFullYear() === currentYear);
-  const yearlyIncome = sum(yearMovements.filter(x => x.type === 'income'), 'amount');
-  const yearlyExpense = sum(yearMovements.filter(x => x.type === 'expense'), 'amount');
-  const monthly = buildMonthlyData(yearMovements, currentYear);
+  const monthly = buildDashboardMonthlyData(financialState.monthly, yearMovements, currentYear);
+  const currentYearRows = monthly.filter(row => String(row.key || '').startsWith(`${currentYear}-`));
+  const yearlyIncome = currentYearRows.reduce((sum, row) => sum + (row.income || 0), 0);
+  const yearlyExpense = currentYearRows.reduce((sum, row) => sum + (row.expense || 0), 0);
   const recentMovements = movements
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 8);
   const loanActive = sum(loans.filter(x => ['active', 'activo', 'overdue', 'atrasado'].includes(x.status)), 'amount');
   const investmentValue = sum(investments, ['currentValue', 'valorActual', 'capitalInvertido', 'invested']);
   const assetValue = sum(assets, ['value', 'valorActual', 'valorCompra']);
-  const financialState = await financeStateManager.getCurrentState({ force: true });
-  const financialMetrics = financialState.metrics || {};
 
   return {
     income: yearlyIncome,
@@ -182,6 +185,7 @@ export async function getGlobalDashboardData() {
     net: yearlyIncome - yearlyExpense,
     financialState,
     financialMetrics,
+    reports,
     liquidCapital: financialMetrics.liquidCapital || 0,
     investedCapital: financialMetrics.investedCapital || 0,
     patrimonio: financialMetrics.patrimonio || 0,
@@ -191,8 +195,8 @@ export async function getGlobalDashboardData() {
     projectedReturn: financialMetrics.projectedReturn || 0,
     liabilities: financialMetrics.liabilities || 0,
     reserves: financialMetrics.reserves || 0,
-    allTimeIncome: sum(movements.filter(x => x.type === 'income'), 'amount'),
-    allTimeExpense: sum(movements.filter(x => x.type === 'expense'), 'amount'),
+    allTimeIncome: financialMetrics.realIncome || 0,
+    allTimeExpense: financialMetrics.realExpense || 0,
     monthly,
     recentMovements,
     capital: investmentValue + assetValue,
@@ -229,13 +233,35 @@ function isRealMovement(row) {
     && !Number.isNaN(date.getTime());
 }
 
-function buildMonthlyData(movements, year) {
-  const months = Array.from({ length: 12 }, () => ({ income: 0, expense: 0 }));
-  for (const movement of movements) {
+function buildDashboardMonthlyData(financialMonthly = [], fallbackMovements = [], year = new Date().getFullYear()) {
+  if (Array.isArray(financialMonthly) && financialMonthly.length) {
+    return financialMonthly.map(row => ({
+      ...row,
+      income: Number(row.realIncome ?? row.income ?? 0),
+      expense: Number(row.realExpense ?? row.expense ?? 0),
+      realProfit: Number(row.realProfit ?? 0),
+      patrimonio: Number(row.patrimonio ?? 0),
+      capitalBase: Number(row.capitalBase ?? 0),
+      yieldRate: Number(row.yieldRate ?? 0),
+    }));
+  }
+
+  const months = Array.from({ length: 12 }, (_, index) => ({
+    key: `${year}-${String(index + 1).padStart(2, '0')}`,
+    income: 0,
+    expense: 0,
+    realProfit: 0,
+    patrimonio: 0,
+    capitalBase: 0,
+    yieldRate: 0,
+  }));
+  for (const movement of fallbackMovements) {
     const date = new Date(movement.date);
     if (date.getFullYear() !== year) continue;
     const bucket = months[date.getMonth()];
-    bucket[movement.type] += movement.amount;
+    bucket.income += movement.realIncomeImpact || 0;
+    bucket.expense += movement.realExpenseImpact || 0;
+    bucket.realProfit += movement.realProfitImpact || 0;
   }
   return months;
 }

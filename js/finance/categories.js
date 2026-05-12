@@ -123,6 +123,7 @@ export const FINANCIAL_CATEGORIES = Object.freeze([
     bucket: CAPITAL_BUCKETS.LIQUID,
     liquidImpact: 1,
     investedImpact: -1,
+    activePortfolioImpact: -1,
     realProfitImpact: 0,
     cashFlowImpact: 0,
   },
@@ -135,6 +136,7 @@ export const FINANCIAL_CATEGORIES = Object.freeze([
     bucket: CAPITAL_BUCKETS.LIQUID,
     liquidImpact: 1,
     investedImpact: -1,
+    activePortfolioImpact: -1,
     realProfitImpact: 0,
     cashFlowImpact: 0,
   },
@@ -147,6 +149,7 @@ export const FINANCIAL_CATEGORIES = Object.freeze([
     bucket: CAPITAL_BUCKETS.LIQUID,
     liquidImpact: 1,
     investedImpact: -1,
+    activePortfolioImpact: -1,
     realProfitImpact: 0,
     cashFlowImpact: 0,
   },
@@ -276,6 +279,24 @@ export function classifyFinancialMovement(row = {}) {
   const realProfitAmount = toNumber(meta.realProfitAmount ?? meta.interestAmount);
   const capitalReturnAmount = toNumber(meta.capitalReturnAmount ?? meta.principalAmount);
   const explicitRealProfitImpact = Number(row.realProfitImpact);
+  const realProfitImpact = Number.isFinite(explicitRealProfitImpact)
+    ? explicitRealProfitImpact
+    : realProfitAmount || amount * (category.realProfitImpact || 0);
+  const liquidImpact = pickExplicit(row.liquidImpact, amount * (category.liquidImpact ?? sign));
+  const investedImpact = pickExplicit(row.investedImpact, amount * (category.investedImpact || 0));
+  const personalAssetImpact = pickExplicit(row.personalAssetImpact, amount * (category.personalAssetImpact || 0));
+  const commercialAssetImpact = pickExplicit(row.commercialAssetImpact, amount * (category.commercialAssetImpact || 0));
+  const reserveImpact = pickExplicit(row.reserveImpact, amount * (category.reserveImpact || 0));
+  const activePortfolioImpact = pickExplicit(row.activePortfolioImpact, amount * (category.activePortfolioImpact || 0));
+  const cashFlowImpact = pickExplicit(row.cashFlowImpact, amount * (category.cashFlowImpact || sign));
+  const isCapitalMovement = realProfitImpact === 0 && (
+    liquidImpact !== 0 ||
+    investedImpact !== 0 ||
+    activePortfolioImpact !== 0 ||
+    personalAssetImpact !== 0 ||
+    commercialAssetImpact !== 0 ||
+    reserveImpact !== 0
+  );
 
   return {
     ...row,
@@ -285,16 +306,47 @@ export function classifyFinancialMovement(row = {}) {
     financeConcept: row.financeConcept || category.concept,
     capitalBucket: row.capitalBucket || category.bucket,
     amount,
-    liquidImpact: pickExplicit(row.liquidImpact, amount * (category.liquidImpact ?? sign)),
-    investedImpact: pickExplicit(row.investedImpact, amount * (category.investedImpact || 0)),
-    personalAssetImpact: pickExplicit(row.personalAssetImpact, amount * (category.personalAssetImpact || 0)),
-    commercialAssetImpact: pickExplicit(row.commercialAssetImpact, amount * (category.commercialAssetImpact || 0)),
-    reserveImpact: pickExplicit(row.reserveImpact, amount * (category.reserveImpact || 0)),
-    realProfitImpact: Number.isFinite(explicitRealProfitImpact)
-      ? explicitRealProfitImpact
-      : realProfitAmount || amount * (category.realProfitImpact || 0),
+    liquidImpact,
+    investedImpact,
+    activePortfolioImpact,
+    personalAssetImpact,
+    commercialAssetImpact,
+    reserveImpact,
+    realProfitImpact,
+    realIncomeImpact: Math.max(realProfitImpact, 0),
+    realExpenseImpact: Math.abs(Math.min(realProfitImpact, 0)),
     capitalReturnAmount,
-    cashFlowImpact: pickExplicit(row.cashFlowImpact, amount * (category.cashFlowImpact || sign)),
+    cashFlowImpact,
+    isCapitalMovement,
+    isInternalMovement: isCapitalMovement && (investedImpact !== 0 || activePortfolioImpact !== 0 || reserveImpact !== 0),
+    impactSummary: buildImpactSummary({
+      liquidImpact,
+      investedImpact,
+      activePortfolioImpact,
+      personalAssetImpact,
+      commercialAssetImpact,
+      reserveImpact,
+      realProfitImpact,
+      cashFlowImpact,
+    }),
+  };
+}
+
+export function buildImpactSummary(impacts = {}) {
+  const rows = [
+    impactRow('Liquidez', impacts.liquidImpact),
+    impactRow('Capital invertido', impacts.investedImpact),
+    impactRow('Cartera activa', impacts.activePortfolioImpact),
+    impactRow('Patrimonio personal', impacts.personalAssetImpact),
+    impactRow('Activos comerciales', impacts.commercialAssetImpact),
+    impactRow('Reservas', impacts.reserveImpact),
+    impactRow('Utilidad real', impacts.realProfitImpact),
+    impactRow('Flujo operativo', impacts.cashFlowImpact),
+  ].filter(Boolean);
+
+  return {
+    rows,
+    text: rows.map(row => `${row.direction} ${row.label}`).join(' · '),
   };
 }
 
@@ -315,4 +367,15 @@ function toNumber(value) {
 
 function pickExplicit(value, fallback) {
   return Number.isFinite(Number(value)) ? Number(value) : fallback;
+}
+
+function impactRow(label, value) {
+  const amount = toNumber(value);
+  if (!amount) return null;
+  return {
+    label,
+    amount,
+    direction: amount > 0 ? '↑' : '↓',
+    tone: amount > 0 ? 'positive' : 'negative',
+  };
 }

@@ -264,6 +264,49 @@ export function calcBalance(loan, payments = []) {
   };
 }
 
+function splitLoanPayment(loan, previousPayments = [], amount = 0) {
+  const principalTotal = Number(loan.amount) || 0;
+  const totalDue = Number(loan.totalAmount || principalTotal + (Number(loan.totalInterest) || 0)) || principalTotal;
+  const interestTotal = Math.max(totalDue - principalTotal, 0);
+  const principalRatio = totalDue > 0 ? principalTotal / totalDue : 1;
+
+  const previous = previousPayments.reduce((acc, payment) => {
+    const paymentAmount = Number(payment.amount) || 0;
+    const storedPrincipal = Number(payment.principalAmount);
+    const storedInterest = Number(payment.interestAmount);
+    if (Number.isFinite(storedPrincipal) || Number.isFinite(storedInterest)) {
+      acc.principal += Number.isFinite(storedPrincipal) ? storedPrincipal : Math.max(paymentAmount - storedInterest, 0);
+      acc.interest += Number.isFinite(storedInterest) ? storedInterest : Math.max(paymentAmount - storedPrincipal, 0);
+      return acc;
+    }
+    const estimatedPrincipal = Math.min(paymentAmount * principalRatio, Math.max(principalTotal - acc.principal, 0));
+    acc.principal += estimatedPrincipal;
+    acc.interest += Math.max(paymentAmount - estimatedPrincipal, 0);
+    return acc;
+  }, { principal: 0, interest: 0 });
+
+  const pendingPrincipal = Math.max(principalTotal - previous.principal, 0);
+  const pendingInterest = Math.max(interestTotal - previous.interest, 0);
+  let principalAmount = Math.min(amount * principalRatio, pendingPrincipal);
+  let interestAmount = Math.min(amount - principalAmount, pendingInterest);
+  let remainder = amount - principalAmount - interestAmount;
+
+  if (remainder > 0) {
+    const extraPrincipal = Math.min(remainder, Math.max(pendingPrincipal - principalAmount, 0));
+    principalAmount += extraPrincipal;
+    remainder -= extraPrincipal;
+  }
+
+  if (remainder > 0) {
+    interestAmount += Math.min(remainder, Math.max(pendingInterest - interestAmount, 0));
+  }
+
+  return {
+    principalAmount: _round(principalAmount),
+    interestAmount: _round(interestAmount),
+  };
+}
+
 // ============================================================
 // CRUD DE PRÉSTAMOS
 // ============================================================
@@ -345,6 +388,11 @@ export async function createLoan(data) {
     reference   : `LOAN-${id}`,
     date        : loan.startDate,
     sourceModule: 'loans',
+    liquidImpact: -loan.amount,
+    investedImpact: loan.amount,
+    activePortfolioImpact: loan.amount,
+    realProfitImpact: 0,
+    cashFlowImpact: 0,
     meta        : { loanId: id, capitalPlacedAmount: loan.amount },
   });
 
@@ -583,10 +631,7 @@ export async function registerPayment(loanId, payData) {
   // Calcular saldo antes del pago
   const prevPayments = _paymentsCache[loanId] || [];
   const balance      = calcBalance(loan, prevPayments);
-  const previousPaid = prevPayments.reduce((s, p) => s + (p.amount || 0), 0);
-  const principalPendingBeforePayment = Math.max((loan.amount || 0) - previousPaid, 0);
-  const principalAmount = Math.min(amount, principalPendingBeforePayment);
-  const interestAmount = Math.max(amount - principalAmount, 0);
+  const { principalAmount, interestAmount } = splitLoanPayment(loan, prevPayments, amount);
 
   if (amount > balance.remaining + 0.01) {
     throw new Error(`El pago (${_formatCurrency(amount)}) supera el saldo pendiente (${_formatCurrency(balance.remaining)})`);
@@ -599,6 +644,8 @@ export async function registerPayment(loanId, payData) {
     date       : payData.date || new Date().toISOString().split('T')[0],
     method     : payData.method || 'efectivo',
     note       : payData.note?.trim() || '',
+    principalAmount,
+    interestAmount,
     createdAt  : new Date().toISOString(),
     isPartial  : amount < loan.installmentAmount - 0.01,
     isFull     : false,    // Se determina tras el pago
@@ -637,7 +684,11 @@ export async function registerPayment(loanId, payData) {
     reference   : `PAY-${payId}-LOAN-${loanId}`,
     date        : payment.date,
     sourceModule: 'loans',
-    realProfitImpact: 0,
+    liquidImpact: amount,
+    investedImpact: -principalAmount,
+    activePortfolioImpact: -principalAmount,
+    realProfitImpact: interestAmount,
+    cashFlowImpact: interestAmount,
     meta        : {
       loanId,
       paymentId: payId,
