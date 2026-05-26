@@ -1301,9 +1301,9 @@ function _buildLoanFormHTML(loan, pledge) {
             <label for="f-amount">Monto prestado</label>
             <div class="input-group">
               <span class="input-prefix">$</span>
-              <input type="number" id="f-amount" class="form-control"
-                placeholder="0" min="0" step="1000"
-                value="${v.amount || ''}" />
+              <input type="text" id="f-amount" class="form-control"
+                placeholder="0" data-money
+                value="${v.amount ? window.Formatters?.formatNumber(v.amount) || v.amount : ''}" />
             </div>
           </div>
           <div class="form-group required">
@@ -1412,9 +1412,9 @@ function _buildLoanFormHTML(loan, pledge) {
               <label for="f-pledgeValue">Valor estimado</label>
               <div class="input-group">
                 <span class="input-prefix">$</span>
-                <input type="number" id="f-pledgeValue" class="form-control"
-                  placeholder="0" min="0"
-                  value="${pledge?.estimatedValue || ''}" />
+                <input type="text" id="f-pledgeValue" class="form-control"
+                  placeholder="0" data-money
+                  value="${pledge?.estimatedValue ? window.Formatters?.formatNumber(pledge.estimatedValue) || pledge.estimatedValue : ''}" />
               </div>
             </div>
             <div class="form-group">
@@ -1430,9 +1430,9 @@ function _buildLoanFormHTML(loan, pledge) {
               <label for="f-pledgeProfit">Ganancia estimada si incumple</label>
               <div class="input-group">
                 <span class="input-prefix">$</span>
-                <input type="number" id="f-pledgeProfit" class="form-control"
-                  placeholder="0" min="0"
-                  value="${pledge?.estimatedProfit || ''}" />
+                <input type="text" id="f-pledgeProfit" class="form-control"
+                  placeholder="0" data-money
+                  value="${pledge?.estimatedProfit ? window.Formatters?.formatNumber(pledge.estimatedProfit) || pledge.estimatedProfit : ''}" />
               </div>
             </div>
             <div class="form-group form-full">
@@ -1494,10 +1494,9 @@ function _buildPaymentFormHTML(loan, balance) {
           <label for="p-amount">Monto a pagar</label>
           <div class="input-group">
             <span class="input-prefix">$</span>
-            <input type="number" id="p-amount" class="form-control"
-              placeholder="0" min="1"
-              max="${balance.remaining}"
-              value="${loan.installmentAmount}" />
+            <input type="text" id="p-amount" class="form-control"
+              placeholder="0" data-money
+              value="${window.Formatters?.formatNumber(loan.installmentAmount) || loan.installmentAmount}" />
           </div>
           <div class="form-hint">
             Pago completo: ${_formatCurrency(loan.installmentAmount)} |
@@ -1702,6 +1701,7 @@ function _bindTableActions() {
  * @param {Object|null} loan — null si es nuevo
  */
 function _bindLoanFormEvents(modalId, loan) {
+  window.Formatters?.bindMoneyInputs(document);
   const calcTriggers = ['f-amount','f-interestRate','f-interestType',
                         'f-installments','f-frequency','f-startDate','f-customDays'];
 
@@ -1736,6 +1736,7 @@ function _bindLoanFormEvents(modalId, loan) {
  * @param {Object} balance
  */
 function _bindPaymentFormEvents(modalId, loanId, balance) {
+  window.Formatters?.bindMoneyInputs(document);
   document.getElementById('btn-submit-payment')?.addEventListener('click', async () => {
     await _handlePaymentSubmit(loanId, balance);
   });
@@ -1750,7 +1751,7 @@ function _updateLoanCalculator() {
   const get = id => document.getElementById(id)?.value;
 
   const data = {
-    amount       : parseFloat(get('f-amount'))       || 0,
+    amount       : window.Formatters?.parseMoney(get('f-amount')) || parseFloat(get('f-amount')) || 0,
     interestRate : parseFloat(get('f-interestRate')) || 0,
     interestType : get('f-interestType')             || INTEREST_TYPE.SIMPLE,
     installments : parseInt(get('f-installments'))   || 1,
@@ -1793,7 +1794,7 @@ async function _handleLoanSubmit(loanId) {
     clientDoc    : get('f-clientDoc'),
     clientAddress: get('f-clientAddress'),
     observations : document.getElementById('f-observations')?.value?.trim(),
-    amount       : parseFloat(get('f-amount')),
+    amount       : window.Formatters?.parseMoney(get('f-amount')) || parseFloat(get('f-amount')),
     interestRate : parseFloat(get('f-interestRate')),
     interestType : get('f-interestType'),
     installments : parseInt(get('f-installments')),
@@ -1803,9 +1804,9 @@ async function _handleLoanSubmit(loanId) {
     hasPledge    : document.getElementById('f-hasPledge')?.checked,
     pledge: {
       description    : document.getElementById('f-pledgeDesc')?.value?.trim(),
-      estimatedValue : parseFloat(document.getElementById('f-pledgeValue')?.value) || 0,
+      estimatedValue : window.Formatters?.parseMoney(document.getElementById('f-pledgeValue')?.value) || parseFloat(document.getElementById('f-pledgeValue')?.value) || 0,
       physicalState  : document.getElementById('f-pledgeState')?.value,
-      estimatedProfit: parseFloat(document.getElementById('f-pledgeProfit')?.value) || null,
+      estimatedProfit: window.Formatters?.parseMoney(document.getElementById('f-pledgeProfit')?.value) || parseFloat(document.getElementById('f-pledgeProfit')?.value) || null,
       notes          : document.getElementById('f-pledgeNotes')?.value?.trim(),
       photos         : [],
     },
@@ -1848,7 +1849,8 @@ async function _handleLoanSubmit(loanId) {
  * @param {Object} balance
  */
 async function _handlePaymentSubmit(loanId, balance) {
-  const amount = parseFloat(document.getElementById('p-amount')?.value);
+  const rawAmount = document.getElementById('p-amount')?.value;
+  const amount = window.Formatters?.parseMoney(rawAmount) || parseFloat(rawAmount);
   const date   = document.getElementById('p-date')?.value;
   const method = document.getElementById('p-method')?.value;
   const note   = document.getElementById('p-note')?.value?.trim();

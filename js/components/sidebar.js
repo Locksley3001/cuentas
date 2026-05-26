@@ -18,8 +18,11 @@ const Sidebar = (() => {
       items: [
         { route: 'finance',     label: 'Finanzas',      icon: '◈', badge: null },
         { route: 'loans',       label: 'Préstamos',     icon: '⟳', badge: '3'  },
-        { route: 'investments', label: 'Inversiones',   icon: '△', badge: null },
-        { route: 'assets',      label: 'Activos',       icon: '◻', badge: null },
+        { route: 'animals',     label: 'Animales',      icon: 'AN', badge: null },
+        { route: 'vehicles',    label: 'Vehiculos',     icon: 'VH', badge: null },
+        { route: 'trading',     label: 'Trading',       icon: 'TR', badge: null },
+        { route: 'software',    label: 'Software',      icon: 'SW', badge: null },
+        { route: 'patrimony',   label: 'Patrimonio',    icon: 'PP', badge: null },
       ],
     },
     {

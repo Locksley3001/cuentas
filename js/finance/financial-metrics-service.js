@@ -14,6 +14,11 @@ export class FinancialMetricsService {
       loanPayments,
       investments,
       assets,
+      animals,
+      vehicles,
+      tradingAccounts,
+      softwareProjects,
+      personalPatrimony,
       liabilities,
     ] = await Promise.all([
       safeAll('transactions'),
@@ -22,6 +27,11 @@ export class FinancialMetricsService {
       safeAll('loan_payments'),
       safeAll('investments'),
       safeAll('assets'),
+      safeAll('animals'),
+      safeAll('vehicles'),
+      safeAll('trading_accounts'),
+      safeAll('software_projects'),
+      safeAll('personal_patrimony'),
       safeAll('liabilities'),
     ]);
 
@@ -32,6 +42,11 @@ export class FinancialMetricsService {
       loanPayments,
       investments,
       assets,
+      animals,
+      vehicles,
+      tradingAccounts,
+      softwareProjects,
+      personalPatrimony,
       liabilities,
     };
   }

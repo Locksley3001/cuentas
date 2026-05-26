@@ -25,6 +25,7 @@ export class FinanceEngine {
     const loanPayments = datasets.loanPayments || [];
     const investments = datasets.investments || [];
     const assets = datasets.assets || [];
+    const businessMetrics = aggregateBusinessModules(datasets);
     const liabilities = datasets.liabilities || [];
 
     const movementMetrics = aggregateMovements(movements);
@@ -36,12 +37,14 @@ export class FinanceEngine {
     const liquidCapital = movementMetrics.liquidCapital;
     const investedCapital = loanMetrics.activePortfolio
       + investmentMetrics.activeCapital
-      + assetMetrics.commercialAssets;
+      + assetMetrics.commercialAssets
+      + businessMetrics.productiveCapital;
     const reserves = movementMetrics.reserves;
     const liabilitiesTotal = liabilityMetrics.total;
     const patrimonio = liquidCapital
       + investedCapital
       + assetMetrics.personalAssets
+      + businessMetrics.personalAssets
       + reserves
       - liabilitiesTotal;
     const loanRealIncome = Math.max(loanMetrics.realIncome, movementMetrics.loanPaymentRealIncome);
@@ -82,14 +85,14 @@ export class FinanceEngine {
         liquidCapital: round(liquidCapital),
         investedCapital: round(investedCapital),
         patrimonio: round(patrimonio),
-        personalAssets: round(assetMetrics.personalAssets),
-        commercialAssets: round(assetMetrics.commercialAssets),
+        personalAssets: round(assetMetrics.personalAssets + businessMetrics.personalAssets),
+        commercialAssets: round(assetMetrics.commercialAssets + businessMetrics.commercialAssets),
         realIncome: round(realIncome),
         realExpense: round(realExpense),
         realProfit: round(realProfit),
         cashFlow: round(movementMetrics.cashFlow),
         activePortfolio: round(loanMetrics.activePortfolio),
-        projectedReturn: round(loanMetrics.projectedReturn + investmentMetrics.projectedReturn),
+        projectedReturn: round(loanMetrics.projectedReturn + investmentMetrics.projectedReturn + businessMetrics.projectedReturn),
         liabilities: round(liabilitiesTotal),
         reserves: round(reserves),
         roi: round(roi),
@@ -108,7 +111,12 @@ export class FinanceEngine {
         investedCapital,
         activePortfolio: loanMetrics.activePortfolio,
         investments: investmentMetrics.activeCapital,
+        animals: businessMetrics.animals,
+        vehicles: businessMetrics.vehiclesBusiness,
+        trading: businessMetrics.trading,
+        software: businessMetrics.software,
         personalAssets: assetMetrics.personalAssets,
+        personalPatrimony: businessMetrics.personalAssets,
         commercialAssets: assetMetrics.commercialAssets,
         reserves,
         liabilities: liabilitiesTotal,
@@ -119,6 +127,7 @@ export class FinanceEngine {
         loans: loanMetrics,
         investments: investmentMetrics,
         assets: assetMetrics,
+        business: businessMetrics,
         liabilities: liabilityMetrics,
       },
       sourceCounts: {
@@ -127,6 +136,11 @@ export class FinanceEngine {
         loanPayments: loanPayments.length,
         investments: investments.length,
         assets: assets.length,
+        animals: (datasets.animals || []).length,
+        vehicles: (datasets.vehicles || []).length,
+        tradingAccounts: (datasets.tradingAccounts || []).length,
+        softwareProjects: (datasets.softwareProjects || []).length,
+        personalPatrimony: (datasets.personalPatrimony || []).length,
         liabilities: liabilities.length,
       },
     };
@@ -315,6 +329,66 @@ function aggregateAssets(assets) {
   });
 }
 
+function aggregateBusinessModules(datasets = {}) {
+  const animals = (datasets.animals || []).reduce((acc, row) => {
+    if (isClosedBusinessRow(row)) {
+      acc.realizedProfit += number(row.ownerProfit);
+      return acc;
+    }
+    acc.capital += number(row.totalInvestment ?? row.purchaseCost);
+    return acc;
+  }, { capital: 0, realizedProfit: 0 });
+
+  const vehicles = (datasets.vehicles || []).reduce((acc, row) => {
+    if (isClosedBusinessRow(row)) return acc;
+    const capital = number(row.totalInvestment ?? row.purchaseCost);
+    const potential = number(row.marketValue) ? number(row.marketValue) - capital : 0;
+    if (row.purpose === 'patrimonio') acc.personal += capital;
+    else acc.business += capital;
+    acc.potential += potential;
+    return acc;
+  }, { business: 0, personal: 0, potential: 0 });
+
+  const trading = (datasets.tradingAccounts || []).reduce((acc, row) => {
+    acc.capital += number(row.capitalTotal ?? (number(row.capitalBroker) + number(row.capitalInvested)));
+    acc.projectedReturn += number(row.pnlUnrealized);
+    acc.realizedPnl += number(row.pnlRealized);
+    return acc;
+  }, { capital: 0, projectedReturn: 0, realizedPnl: 0 });
+
+  const software = (datasets.softwareProjects || []).reduce((acc, row) => {
+    if (['desarrollo', 'soporte', 'propuesta'].includes(row.status)) {
+      acc.activePipeline += Math.max(number(row.costs) - number(row.payments), 0);
+    }
+    acc.payments += number(row.payments);
+    acc.costs += number(row.costs);
+    return acc;
+  }, { activePipeline: 0, payments: 0, costs: 0 });
+
+  const personalPatrimony = (datasets.personalPatrimony || []).reduce((acc, row) => {
+    if (!isClosedBusinessRow(row)) acc += number(row.purchaseCost);
+    return acc;
+  }, 0);
+
+  const productiveCapital = animals.capital + vehicles.business + trading.capital + software.activePipeline;
+  const personalAssets = vehicles.personal + personalPatrimony;
+
+  return {
+    animals: round(animals.capital),
+    vehiclesBusiness: round(vehicles.business),
+    vehiclesPersonal: round(vehicles.personal),
+    trading: round(trading.capital),
+    software: round(software.activePipeline),
+    personalPatrimony: round(personalPatrimony),
+    productiveCapital: round(productiveCapital),
+    commercialAssets: round(animals.capital + vehicles.business),
+    personalAssets: round(personalAssets),
+    projectedReturn: round(trading.projectedReturn + Math.max(vehicles.potential, 0)),
+    realizedPnl: round(trading.realizedPnl),
+    softwareProfit: round(software.payments - software.costs),
+  };
+}
+
 function aggregateLiabilities(liabilities) {
   return {
     total: liabilities.reduce((acc, liability) => acc + number(liability.balance ?? liability.amount), 0),
@@ -428,9 +502,14 @@ function buildComposition(values) {
   const positiveRows = [
     { key: 'liquid', label: 'Liquidez disponible', value: values.liquidCapital, color: 'accent' },
     { key: 'activePortfolio', label: 'Cartera activa', value: values.activePortfolio, color: 'warning' },
+    { key: 'animals', label: 'Animales', value: values.animals, color: 'success' },
+    { key: 'vehicles', label: 'Vehiculos negocio', value: values.vehicles, color: 'accent-2' },
+    { key: 'trading', label: 'Trading', value: values.trading, color: 'accent' },
+    { key: 'software', label: 'Software', value: values.software, color: 'success' },
     { key: 'investments', label: 'Inversiones', value: values.investments, color: 'success' },
     { key: 'commercialAssets', label: 'Activos comerciales', value: values.commercialAssets, color: 'accent-2' },
     { key: 'personalAssets', label: 'Patrimonio personal', value: values.personalAssets, color: 'success' },
+    { key: 'personalPatrimony', label: 'Bienes personales', value: values.personalPatrimony, color: 'warning' },
     { key: 'reserves', label: 'Reservas', value: values.reserves, color: 'warning' },
   ].filter(row => row.value > 0);
 
@@ -484,6 +563,10 @@ function isRealMovement(row) {
 function isLoanPaymentMovement(movement) {
   return movement.sourceModule === 'loans'
     && ['cuota_recibida', 'prestamo_pagado'].includes(movement.category);
+}
+
+function isClosedBusinessRow(row = {}) {
+  return ['sold', 'vendido', 'cerrado', 'entregado', 'cancelado', 'inactivo'].includes(String(row.status || row.estado || '').toLowerCase());
 }
 
 function groupBy(rows, getKey) {

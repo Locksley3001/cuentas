@@ -9,6 +9,7 @@ import './router.js';
 import './components/cards.js';
 import './components/sidebar.js';
 import './components/navbar.js';
+import './utils/format.js';
 import { DashboardModule } from './modules/dashboard.js';
 import { setupGlobalIntegrations } from './modules/integrations.js';
 import { HistoryModule, initHistory } from './modules/history.js';
@@ -59,14 +60,12 @@ async function registerRoutes() {
     finance,
     loans,
     crm,
-    investments,
-    assets,
+    businessModules,
   ] = await Promise.all([
     import('./modules/finance.js'),
     import('./modules/loans.js'),
     import('./modules/crm.js'),
-    import('./modules/investments.js'),
-    import('./modules/assets.js'),
+    import('./modules/business-modules.js'),
   ]);
 
   Router.register('finance', () => finance.initFinance(container));
@@ -78,8 +77,11 @@ async function registerRoutes() {
     container.innerHTML = '<div id="crm-container"></div>';
     await crm.initCRM();
   });
-  Router.register('investments', () => investments.initInvestments(container));
-  Router.register('assets', () => assets.initAssets(container));
+  Router.register('animals', () => businessModules.initAnimals(container));
+  Router.register('vehicles', () => businessModules.initVehicles(container));
+  Router.register('trading', () => businessModules.initTrading(container));
+  Router.register('software', () => businessModules.initSoftware(container));
+  Router.register('patrimony', () => businessModules.initPersonalPatrimony(container));
   Router.register('history', () => initHistory(container));
   Router.register('settings', () => initSettings(container));
 }
@@ -103,8 +105,9 @@ function bindGlobalKeys() {
       if (route === 'finance') document.getElementById('fin-btn-new')?.click();
       if (route === 'loans') document.getElementById('btn-new-loan')?.click();
       if (route === 'crm') document.getElementById('btn-new-lead')?.click();
-      if (route === 'investments') document.getElementById('btnAddInvestment')?.click();
-      if (route === 'assets') document.getElementById('btnAddAsset')?.click();
+      if (['animals', 'vehicles', 'trading', 'software', 'patrimony'].includes(route)) {
+        document.querySelector('[data-action="create"]')?.click();
+      }
     }
   });
 }

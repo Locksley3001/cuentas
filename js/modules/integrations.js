@@ -149,6 +149,11 @@ export async function getGlobalDashboardData() {
     leads,
     investments,
     assets,
+    animals,
+    vehicles,
+    tradingAccounts,
+    softwareProjects,
+    personalPatrimony,
     history,
   ] = await Promise.all([
     safeAll('transactions'),
@@ -157,6 +162,11 @@ export async function getGlobalDashboardData() {
     safeAll('crm_leads'),
     safeAll('investments'),
     safeAll('assets'),
+    safeAll('animals'),
+    safeAll('vehicles'),
+    safeAll('trading_accounts'),
+    safeAll('software_projects'),
+    safeAll('personal_patrimony'),
     safeAll('history'),
   ]);
 
@@ -205,8 +215,13 @@ export async function getGlobalDashboardData() {
     leads: leads.length,
     investments: investments.length,
     assets: assets.length,
+    animals: animals.length,
+    vehicles: vehicles.length,
+    tradingAccounts: tradingAccounts.length,
+    softwareProjects: softwareProjects.length,
+    personalPatrimony: personalPatrimony.length,
     history: history.slice(-8).reverse(),
-    alerts: buildAlerts({ loans, leads, investments, assets }),
+    alerts: buildAlerts({ loans, leads, investments, assets, animals, vehicles, tradingAccounts, softwareProjects, personalPatrimony }),
   };
 }
 
@@ -303,16 +318,15 @@ function sum(rows, keys) {
   }, 0);
 }
 
-function buildAlerts({ loans, leads, investments, assets }) {
+function buildAlerts({ loans, leads, animals = [], vehicles = [], tradingAccounts = [], softwareProjects = [], personalPatrimony = [] }) {
   const alerts = [];
   const overdueLoans = loans.filter(l => ['atrasado', 'overdue'].includes(l.status));
   const pendingTasks = leads.filter(l => l.nextActionDate && l.nextActionDate < new Date().toISOString().slice(0, 10));
-  const inactiveInvestments = investments.filter(i => ['cerrada', 'closed', 'pausada'].includes(i.estado || i.status));
+  const businessCount = animals.length + vehicles.length + tradingAccounts.length + softwareProjects.length + personalPatrimony.length;
 
   if (overdueLoans.length) alerts.push({ type: 'warning', title: 'Préstamos atrasados', text: `${overdueLoans.length} préstamo(s) requieren seguimiento.` });
   if (pendingTasks.length) alerts.push({ type: 'info', title: 'CRM pendiente', text: `${pendingTasks.length} lead(s) tienen próxima acción vencida.` });
-  if (inactiveInvestments.length) alerts.push({ type: 'info', title: 'Inversiones sin actividad', text: `${inactiveInvestments.length} inversión(es) no están activas.` });
-  if (!assets.length) alerts.push({ type: 'info', title: 'Inventario vacío', text: 'Registra activos para completar el patrimonio global.' });
+  if (!businessCount) alerts.push({ type: 'info', title: 'Negocios sin registrar', text: 'Registra animales, vehiculos, trading, software o patrimonio para completar el analisis.' });
 
   return alerts;
 }

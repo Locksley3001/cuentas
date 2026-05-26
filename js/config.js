@@ -11,7 +11,7 @@ const APP_CONFIG = {
   /* ── Configuración de almacenamiento ─────────────────────── */
   db: {
     name:    'cuentasDB',
-    version: 11,
+    version: 12,
     /* Stores que se crearán en IndexedDB */
     stores: {
       transactions: { keyPath: 'id', autoIncrement: true },
@@ -31,6 +31,11 @@ const APP_CONFIG = {
       assets:       { keyPath: 'id', autoIncrement: true },
       asset_history:{ keyPath: 'id', autoIncrement: true },
       asset_value_history:{ keyPath: 'id', autoIncrement: true },
+      animals:      { keyPath: 'id', autoIncrement: true },
+      vehicles:     { keyPath: 'id', autoIncrement: true },
+      trading_accounts: { keyPath: 'id', autoIncrement: true },
+      software_projects: { keyPath: 'id', autoIncrement: true },
+      personal_patrimony: { keyPath: 'id', autoIncrement: true },
       financial_accounts: { keyPath: 'id', autoIncrement: true },
       financial_categories: { keyPath: 'value' },
       financial_state_snapshots: { keyPath: 'id', autoIncrement: true },
@@ -55,8 +60,13 @@ const APP_CONFIG = {
     finance:     { label: 'Finanzas',         icon: '◈',  module: 'finance'     },
     loans:       { label: 'Préstamos',        icon: '⟳',  module: 'loans'       },
     crm:         { label: 'Clientes (CRM)',   icon: '◉',  module: 'crm'         },
-    investments: { label: 'Inversiones',      icon: '△',  module: 'investments' },
-    assets:      { label: 'Activos',          icon: '◻',  module: 'assets'      },
+    animals:     { label: 'Animales',         icon: 'AN',  module: 'animals'     },
+    vehicles:    { label: 'Vehiculos',        icon: 'VH',  module: 'vehicles'    },
+    trading:     { label: 'Trading',          icon: 'TR',  module: 'trading'     },
+    software:    { label: 'Software',         icon: 'SW',  module: 'software'    },
+    patrimony:   { label: 'Patrimonio personal', icon: 'PP', module: 'patrimony' },
+    investments: { label: 'Inversiones',      icon: '△',  module: 'investments', hidden: true },
+    assets:      { label: 'Activos',          icon: '◻',  module: 'assets', hidden: true },
     history:     { label: 'Historial',        icon: '≡',  module: 'history'     },
     settings:    { label: 'Configuración',    icon: '⚙',  module: 'settings'    },
   },

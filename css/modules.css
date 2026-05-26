@@ -2051,3 +2051,123 @@ input:-webkit-autofill:focus {
   font-size: 3.5rem;
   opacity: 0.2;
 }
+
+.business-kicker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 24px;
+  padding: 0 8px;
+  margin-bottom: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.business-count {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.business-table-shell {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+.business-table .amount {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.business-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.business-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.business-form .form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--space-md);
+}
+
+.business-derived,
+.form-static.business-derived {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--accent);
+  font-family: var(--font-mono);
+}
+
+.business-sale-preview {
+  margin-top: var(--space-md);
+}
+
+.sale-preview-grid,
+.business-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-sm);
+}
+
+.sale-preview-item,
+.business-detail-item {
+  background: rgba(255,255,255,0.035);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  min-width: 0;
+}
+
+.sale-preview-item span,
+.business-detail-item span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 6px;
+}
+
+.sale-preview-item strong,
+.business-detail-item strong {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.badge-neutral {
+  background: rgba(148,163,184,0.12);
+  color: var(--text-secondary);
+  border-color: rgba(148,163,184,0.25);
+}
+
+@media (max-width: 720px) {
+  .business-actions {
+    flex-direction: column;
+  }
+
+  .business-actions .btn {
+    width: 100%;
+  }
+}

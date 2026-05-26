@@ -86,6 +86,7 @@ const Router = (() => {
 
     const icons = {
       finance:     '◈', loans: '⟳', crm: '◉',
+      animals: 'AN', vehicles: 'VH', trading: 'TR', software: 'SW', patrimony: 'PP',
       investments: '△', assets: '◻', history: '≡', settings: '⚙',
     };
 
@@ -93,6 +94,11 @@ const Router = (() => {
       finance:     'Gestión completa de ingresos, gastos y flujo de caja.',
       loans:       'Control de préstamos otorgados, cuotas y mora.',
       crm:         'Directorio de clientes, contactos y seguimiento.',
+      animals:     'Control financiero de animales productivos.',
+      vehicles:    'Vehiculos de negocio y patrimonio.',
+      trading:     'Capital en brokers y PnL.',
+      software:    'Proyectos, clientes, pagos y utilidad.',
+      patrimony:   'Bienes personales separados del negocio.',
       investments: 'Portafolio de inversiones, rentabilidad y análisis.',
       assets:      'Inventario de activos físicos y digitales.',
       history:     'Registro cronológico de todas las operaciones.',

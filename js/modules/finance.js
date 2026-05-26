@@ -1507,6 +1507,13 @@ class FinanceModule {
         },
       ],
       onOpen: (container) => {
+        const amountInput = container.querySelector('#mov-amount');
+        if (amountInput) {
+          amountInput.type = 'text';
+          amountInput.dataset.money = '';
+          if (existing?.amount) amountInput.value = window.Formatters?.formatNumber(existing.amount) || existing.amount;
+          window.Formatters?.bindMoneyInputs(container);
+        }
         // Cuando cambia el tipo, actualizar opciones de categoría
         const typeSelect = container.querySelector('#mov-type');
         const catSelect  = container.querySelector('#mov-category');
@@ -1528,7 +1535,9 @@ class FinanceModule {
     const data = getModalFormData();
 
     // Validación extra: monto positivo
-    const amount = parseFloat(data['mov-amount']);
+    const amount = window.Formatters?.parseMoney
+      ? window.Formatters.parseMoney(data['mov-amount'])
+      : parseFloat(data['mov-amount']);
     if (isNaN(amount) || amount <= 0) {
       modalSystem.showAlert('El monto debe ser mayor a 0', 'danger');
       return false;
@@ -1695,6 +1704,10 @@ export async function registerTransaction(data) {
     capitalBucket: data.capitalBucket,
     liquidImpact: data.liquidImpact,
     investedImpact: data.investedImpact,
+    activePortfolioImpact: data.activePortfolioImpact,
+    personalAssetImpact: data.personalAssetImpact,
+    commercialAssetImpact: data.commercialAssetImpact,
+    reserveImpact: data.reserveImpact,
     realProfitImpact: data.realProfitImpact,
     cashFlowImpact: data.cashFlowImpact,
     meta: data.meta || {},

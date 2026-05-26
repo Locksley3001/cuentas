@@ -90,9 +90,9 @@ const DashboardModule = (() => {
         </div>
 
         <div class="metrics-grid">
-          ${Cards.metric({ label: 'Patrimonio', value: fmtSigned(patrimonio), delta: '', deltaType: patrimonio >= 0 ? 'up' : 'down', icon: '◆', type: 'capital', sub: 'Liquidez + inversiones + activos - pasivos' })}
+          ${Cards.metric({ label: 'Patrimonio', value: fmtSigned(patrimonio), delta: '', deltaType: patrimonio >= 0 ? 'up' : 'down', icon: '◆', type: 'capital', sub: 'Liquidez + negocios + patrimonio personal - pasivos' })}
           ${Cards.metric({ label: 'Capital liquido', value: fmtSigned(liquidCapital), delta: '', deltaType: liquidCapital >= 0 ? 'up' : 'down', icon: '▲', type: 'income', sub: 'Disponible estimado' })}
-          ${Cards.metric({ label: 'Capital invertido', value: fmt(investedCapital), delta: '', deltaType: 'neutral', icon: '●', type: 'profit', sub: 'Cartera + inversiones + activos comerciales' })}
+          ${Cards.metric({ label: 'Capital invertido', value: fmt(investedCapital), delta: '', deltaType: 'neutral', icon: '●', type: 'profit', sub: 'Cartera + animales + vehiculos + trading + software' })}
           ${Cards.metric({ label: 'Utilidad real', value: fmtSigned(realProfit), delta: '', deltaType: realProfit >= 0 ? 'up' : 'down', icon: '▼', type: 'expense', sub: 'Ganancias reales sin devolucion de capital' })}
         </div>
 
@@ -101,6 +101,13 @@ const DashboardModule = (() => {
           ${Cards.quickStat({ label: 'Retorno proyectado', value: fmt(projectedReturn), color: 'accent' })}
           ${Cards.quickStat({ label: 'Liquidez disponible', value: fmtSigned(liquidityAvailable), color: 'accent-2' })}
         </div>
+
+        ${_renderMainFinancialChart(composition, {
+          patrimonio,
+          liquidCapital,
+          activePortfolio,
+          realProfit,
+        })}
 
         <div class="finance-indicators-grid">
           ${_renderIndicator('ROI', fmtPct(roi), 'Utilidad real sobre capital productivo', roi >= 0 ? 'positive' : 'negative')}
@@ -247,6 +254,86 @@ const DashboardModule = (() => {
         })).join('')}
       </div>
     `;
+  }
+
+  function _renderMainFinancialChart(composition = {}, metrics = {}) {
+    const rows = normalizeChartRows(composition.rows || [], metrics);
+    if (!rows.length) {
+      return `
+        <section class="capital-map-panel">
+          <div class="capital-map-empty">
+            <span>Sin distribucion financiera suficiente</span>
+            <small>El grafico se activara con registros reales en prestamos, animales, vehiculos, trading, software o patrimonio.</small>
+          </div>
+        </section>
+      `;
+    }
+
+    const gradient = buildConicGradient(rows);
+    return `
+      <section class="capital-map-panel">
+        <div class="capital-map-copy">
+          <span class="capital-map-kicker">Mapa financiero</span>
+          <h2>Distribucion real de capital</h2>
+          <p>Lectura consolidada de liquidez, cartera, negocios, patrimonio y utilidad real.</p>
+          <div class="capital-map-total">${fmtSigned(metrics.patrimonio)}</div>
+        </div>
+        <div class="capital-map-visual">
+          <div class="capital-orbit" style="background:${gradient}">
+            <div class="capital-orbit-core">
+              <span>Patrimonio</span>
+              <strong>${fmtSigned(metrics.patrimonio)}</strong>
+              <small>Utilidad ${fmtSigned(metrics.realProfit)}</small>
+            </div>
+          </div>
+        </div>
+        <div class="capital-map-legend">
+          ${rows.map(row => `
+            <div class="capital-legend-row">
+              <span class="legend-swatch" style="background:${row.color}"></span>
+              <span>${escapeHtml(row.label)}</span>
+              <strong>${fmt(row.value)}</strong>
+            </div>
+          `).join('')}
+        </div>
+      </section>
+    `;
+  }
+
+  function normalizeChartRows(rows, metrics) {
+    const colorMap = {
+      liquid: '#38bdf8',
+      activePortfolio: '#f5c451',
+      animals: '#4ecdc4',
+      vehicles: '#9ca3ff',
+      trading: '#8fd7ff',
+      software: '#6ee7b7',
+      personalPatrimony: '#c4b5fd',
+      personalAssets: '#c4b5fd',
+      realProfit: '#22c55e',
+    };
+    const filtered = rows
+      .filter(row => Number(row.value) > 0)
+      .map(row => ({
+        label: row.label,
+        value: Number(row.value) || 0,
+        color: colorMap[row.key] || '#64748b',
+      }));
+    if (metrics.realProfit > 0) {
+      filtered.push({ label: 'Utilidad real', value: metrics.realProfit, color: colorMap.realProfit });
+    }
+    return filtered.slice(0, 8);
+  }
+
+  function buildConicGradient(rows) {
+    const total = rows.reduce((sum, row) => sum + row.value, 0) || 1;
+    let cursor = 0;
+    const parts = rows.map(row => {
+      const start = cursor;
+      cursor += (row.value / total) * 100;
+      return `${row.color} ${start.toFixed(2)}% ${cursor.toFixed(2)}%`;
+    });
+    return `conic-gradient(${parts.join(', ')})`;
   }
 
   function _renderCapitalComposition(composition = {}, fallback = {}) {
@@ -459,7 +546,7 @@ const DashboardModule = (() => {
           </div>
           <div class="form-group">
             <label class="form-label required">Monto (${code})</label>
-            <input class="form-input" type="number" id="tx-amount" placeholder="0" min="0" />
+            <input class="form-input" type="text" id="tx-amount" placeholder="0" data-money />
           </div>
         </div>
         <div class="form-group">
@@ -498,7 +585,9 @@ const DashboardModule = (() => {
 
   async function saveTransaction() {
     const type = document.getElementById('tx-type')?.value;
-    const amount = parseFloat(document.getElementById('tx-amount')?.value);
+    const amount = window.Formatters?.parseMoney
+      ? window.Formatters.parseMoney(document.getElementById('tx-amount')?.value)
+      : parseFloat(document.getElementById('tx-amount')?.value);
     const desc = document.getElementById('tx-desc')?.value?.trim();
     const category = document.getElementById('tx-category')?.value;
     const date = document.getElementById('tx-date')?.value;

@@ -144,6 +144,14 @@ const Storage = (() => {
     },
   };
 
+  const Business = {
+    Animals: crudStore('animals'),
+    Vehicles: crudStore('vehicles'),
+    Trading: crudStore('trading_accounts'),
+    Software: crudStore('software_projects'),
+    Patrimony: crudStore('personal_patrimony'),
+  };
+
   /* ════════════════════════════════════════════════════════════
      HISTORIAL (log de actividad)
      ════════════════════════════════════════════════════════════ */
@@ -207,6 +215,16 @@ const Storage = (() => {
     const type = row.type === 'ingreso' ? 'income' : row.type === 'egreso' ? 'expense' : row.type;
     const amount = Number(row.amount ?? row.monto);
     return ['income', 'expense'].includes(type) && Number.isFinite(amount) && amount > 0;
+  }
+
+  function crudStore(storeName) {
+    return {
+      add: (data) => DB.add(storeName, data),
+      update: (data) => DB.update(storeName, data),
+      delete: (id) => DB.remove(storeName, id),
+      getAll: () => DB.getAll(storeName),
+      getById: (id) => DB.getById(storeName, id),
+    };
   }
 
   async function seedDemoData() {
@@ -377,6 +395,7 @@ const Storage = (() => {
     Clients,
     Investments,
     Assets,
+    Business,
     History,
     Settings,
     seedDemoData,
