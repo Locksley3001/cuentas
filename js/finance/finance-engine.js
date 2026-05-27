@@ -2,6 +2,7 @@ import {
   classifyFinancialMovement,
   FINANCIAL_CONCEPTS,
 } from './categories.js';
+import { buildMarketplaceFinanceContribution } from '../marketplace/marketplace-service.js';
 
 const ACTIVE_LOAN_STATUSES = new Set(['active', 'activo', 'overdue', 'atrasado']);
 const PAID_LOAN_STATUSES = new Set(['paid', 'pagado', 'completed']);
@@ -26,6 +27,7 @@ export class FinanceEngine {
     const investments = datasets.investments || [];
     const assets = datasets.assets || [];
     const businessMetrics = aggregateBusinessModules(datasets);
+    const marketplaceMetrics = buildMarketplaceFinanceContribution(datasets.marketplaceProducts || []);
     const liabilities = datasets.liabilities || [];
 
     const movementMetrics = aggregateMovements(movements);
@@ -38,7 +40,8 @@ export class FinanceEngine {
     const investedCapital = loanMetrics.activePortfolio
       + investmentMetrics.activeCapital
       + assetMetrics.commercialAssets
-      + businessMetrics.productiveCapital;
+      + businessMetrics.productiveCapital
+      + marketplaceMetrics.capitalBlocked;
     const reserves = movementMetrics.reserves;
     const liabilitiesTotal = liabilityMetrics.total;
     const patrimonio = liquidCapital
@@ -86,13 +89,13 @@ export class FinanceEngine {
         investedCapital: round(investedCapital),
         patrimonio: round(patrimonio),
         personalAssets: round(assetMetrics.personalAssets + businessMetrics.personalAssets),
-        commercialAssets: round(assetMetrics.commercialAssets + businessMetrics.commercialAssets),
+        commercialAssets: round(assetMetrics.commercialAssets + businessMetrics.commercialAssets + marketplaceMetrics.inventoryValue),
         realIncome: round(realIncome),
         realExpense: round(realExpense),
         realProfit: round(realProfit),
         cashFlow: round(movementMetrics.cashFlow),
         activePortfolio: round(loanMetrics.activePortfolio),
-        projectedReturn: round(loanMetrics.projectedReturn + investmentMetrics.projectedReturn + businessMetrics.projectedReturn),
+        projectedReturn: round(loanMetrics.projectedReturn + investmentMetrics.projectedReturn + businessMetrics.projectedReturn + marketplaceMetrics.utilityPotential),
         liabilities: round(liabilitiesTotal),
         reserves: round(reserves),
         roi: round(roi),
@@ -115,6 +118,7 @@ export class FinanceEngine {
         vehicles: businessMetrics.vehiclesBusiness,
         trading: businessMetrics.trading,
         software: businessMetrics.software,
+        marketplace: marketplaceMetrics.capitalBlocked,
         personalAssets: assetMetrics.personalAssets,
         personalPatrimony: businessMetrics.personalAssets,
         commercialAssets: assetMetrics.commercialAssets,
@@ -128,6 +132,7 @@ export class FinanceEngine {
         investments: investmentMetrics,
         assets: assetMetrics,
         business: businessMetrics,
+        marketplace: marketplaceMetrics,
         liabilities: liabilityMetrics,
       },
       sourceCounts: {
@@ -141,6 +146,7 @@ export class FinanceEngine {
         tradingAccounts: (datasets.tradingAccounts || []).length,
         softwareProjects: (datasets.softwareProjects || []).length,
         personalPatrimony: (datasets.personalPatrimony || []).length,
+        marketplaceProducts: (datasets.marketplaceProducts || []).length,
         liabilities: liabilities.length,
       },
     };
@@ -506,6 +512,7 @@ function buildComposition(values) {
     { key: 'vehicles', label: 'Vehiculos negocio', value: values.vehicles, color: 'accent-2' },
     { key: 'trading', label: 'Trading', value: values.trading, color: 'accent' },
     { key: 'software', label: 'Software', value: values.software, color: 'success' },
+    { key: 'marketplace', label: 'Marketplace', value: values.marketplace, color: 'accent' },
     { key: 'investments', label: 'Inversiones', value: values.investments, color: 'success' },
     { key: 'commercialAssets', label: 'Activos comerciales', value: values.commercialAssets, color: 'accent-2' },
     { key: 'personalAssets', label: 'Patrimonio personal', value: values.personalAssets, color: 'success' },

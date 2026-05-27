@@ -91,12 +91,15 @@ function describeExternalFinanceEvent(source, eventType, data) {
     asset: `Activo registrado: ${name}`,
     asset_update: `Activo actualizado: ${name}`,
     payment: `Pago registrado: ${name}`,
+    product_created: `Marketplace producto registrado: ${name}`,
+    product_confirmed: `Marketplace compra confirmada: ${name}`,
+    product_sold: `Marketplace venta registrada: ${name}`,
   };
   return labels[eventType] || `${source}: ${eventType}`;
 }
 
 function pickAmount(data = {}) {
-  const candidates = [data.amount, data.monto, data.valorActual, data.valorCompra, data.capitalInvertido, data.capital, data.dealValue];
+  const candidates = [data.amount, data.monto, data.totalCost, data.saleTotal, data.realProfit, data.valorActual, data.valorCompra, data.capitalInvertido, data.capital, data.dealValue];
   const found = candidates.find(v => Number.isFinite(Number(v)));
   return found === undefined ? null : Number(found);
 }
@@ -154,6 +157,7 @@ export async function getGlobalDashboardData() {
     tradingAccounts,
     softwareProjects,
     personalPatrimony,
+    marketplaceProducts,
     history,
   ] = await Promise.all([
     safeAll('transactions'),
@@ -167,6 +171,7 @@ export async function getGlobalDashboardData() {
     safeAll('trading_accounts'),
     safeAll('software_projects'),
     safeAll('personal_patrimony'),
+    safeAll('marketplace_products'),
     safeAll('history'),
   ]);
 
@@ -220,8 +225,9 @@ export async function getGlobalDashboardData() {
     tradingAccounts: tradingAccounts.length,
     softwareProjects: softwareProjects.length,
     personalPatrimony: personalPatrimony.length,
+    marketplaceProducts: marketplaceProducts.length,
     history: history.slice(-8).reverse(),
-    alerts: buildAlerts({ loans, leads, investments, assets, animals, vehicles, tradingAccounts, softwareProjects, personalPatrimony }),
+    alerts: buildAlerts({ loans, leads, investments, assets, animals, vehicles, tradingAccounts, softwareProjects, personalPatrimony, marketplaceProducts }),
   };
 }
 
@@ -318,15 +324,15 @@ function sum(rows, keys) {
   }, 0);
 }
 
-function buildAlerts({ loans, leads, animals = [], vehicles = [], tradingAccounts = [], softwareProjects = [], personalPatrimony = [] }) {
+function buildAlerts({ loans, leads, animals = [], vehicles = [], tradingAccounts = [], softwareProjects = [], personalPatrimony = [], marketplaceProducts = [] }) {
   const alerts = [];
   const overdueLoans = loans.filter(l => ['atrasado', 'overdue'].includes(l.status));
   const pendingTasks = leads.filter(l => l.nextActionDate && l.nextActionDate < new Date().toISOString().slice(0, 10));
-  const businessCount = animals.length + vehicles.length + tradingAccounts.length + softwareProjects.length + personalPatrimony.length;
+  const businessCount = animals.length + vehicles.length + tradingAccounts.length + softwareProjects.length + personalPatrimony.length + marketplaceProducts.length;
 
   if (overdueLoans.length) alerts.push({ type: 'warning', title: 'Préstamos atrasados', text: `${overdueLoans.length} préstamo(s) requieren seguimiento.` });
   if (pendingTasks.length) alerts.push({ type: 'info', title: 'CRM pendiente', text: `${pendingTasks.length} lead(s) tienen próxima acción vencida.` });
-  if (!businessCount) alerts.push({ type: 'info', title: 'Negocios sin registrar', text: 'Registra animales, vehiculos, trading, software o patrimonio para completar el analisis.' });
+  if (!businessCount) alerts.push({ type: 'info', title: 'Negocios sin registrar', text: 'Registra animales, vehiculos, marketplace, trading, software o patrimonio para completar el analisis.' });
 
   return alerts;
 }

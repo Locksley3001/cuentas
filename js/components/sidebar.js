@@ -18,6 +18,7 @@ const Sidebar = (() => {
       items: [
         { route: 'finance',     label: 'Finanzas',      icon: '◈', badge: null },
         { route: 'loans',       label: 'Préstamos',     icon: '⟳', badge: '3'  },
+        { route: 'marketplace', label: 'Marketplace',   icon: 'MK', badge: null },
         { route: 'animals',     label: 'Animales',      icon: 'AN', badge: null },
         { route: 'vehicles',    label: 'Vehiculos',     icon: 'VH', badge: null },
         { route: 'trading',     label: 'Trading',       icon: 'TR', badge: null },

@@ -25,6 +25,7 @@ const MODULE_LABELS = {
   loans: 'Préstamos',
   crm: 'CRM',
   animals: 'Animales',
+  marketplace: 'Marketplace',
   vehicles: 'Vehiculos',
   software: 'Software',
   trading: 'Trading',

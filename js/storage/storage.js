@@ -152,6 +152,13 @@ const Storage = (() => {
     Patrimony: crudStore('personal_patrimony'),
   };
 
+  const Marketplace = {
+    Products: crudStore('marketplace_products'),
+    Categories: crudStore('marketplace_categories'),
+    Suppliers: crudStore('marketplace_suppliers'),
+    Sales: crudStore('marketplace_sales'),
+  };
+
   /* ════════════════════════════════════════════════════════════
      HISTORIAL (log de actividad)
      ════════════════════════════════════════════════════════════ */
@@ -396,6 +403,7 @@ const Storage = (() => {
     Investments,
     Assets,
     Business,
+    Marketplace,
     History,
     Settings,
     seedDemoData,

@@ -86,7 +86,7 @@ const Router = (() => {
 
     const icons = {
       finance:     '◈', loans: '⟳', crm: '◉',
-      animals: 'AN', vehicles: 'VH', trading: 'TR', software: 'SW', patrimony: 'PP',
+      animals: 'AN', vehicles: 'VH', trading: 'TR', software: 'SW', patrimony: 'PP', marketplace: 'MK',
       investments: '△', assets: '◻', history: '≡', settings: '⚙',
     };
 
@@ -99,6 +99,7 @@ const Router = (() => {
       trading:     'Capital en brokers y PnL.',
       software:    'Proyectos, clientes, pagos y utilidad.',
       patrimony:   'Bienes personales separados del negocio.',
+      marketplace: 'Simulador de oportunidades, inventario y reventa.',
       investments: 'Portafolio de inversiones, rentabilidad y análisis.',
       assets:      'Inventario de activos físicos y digitales.',
       history:     'Registro cronológico de todas las operaciones.',

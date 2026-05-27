@@ -19,6 +19,7 @@ export class FinancialMetricsService {
       tradingAccounts,
       softwareProjects,
       personalPatrimony,
+      marketplaceProducts,
       liabilities,
     ] = await Promise.all([
       safeAll('transactions'),
@@ -32,6 +33,7 @@ export class FinancialMetricsService {
       safeAll('trading_accounts'),
       safeAll('software_projects'),
       safeAll('personal_patrimony'),
+      safeAll('marketplace_products'),
       safeAll('liabilities'),
     ]);
 
@@ -47,6 +49,7 @@ export class FinancialMetricsService {
       tradingAccounts,
       softwareProjects,
       personalPatrimony,
+      marketplaceProducts,
       liabilities,
     };
   }

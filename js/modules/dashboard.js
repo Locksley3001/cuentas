@@ -308,6 +308,7 @@ const DashboardModule = (() => {
       vehicles: '#9ca3ff',
       trading: '#8fd7ff',
       software: '#6ee7b7',
+      marketplace: '#67e8f9',
       personalPatrimony: '#c4b5fd',
       personalAssets: '#c4b5fd',
       realProfit: '#22c55e',

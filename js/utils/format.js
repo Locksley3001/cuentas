@@ -63,9 +63,9 @@ const Formatters = {
   moneyValue,
 };
 
-window.Formatters = Formatters;
+if (typeof window !== 'undefined') window.Formatters = Formatters;
 
-if (typeof document !== 'undefined') {
+if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined') {
   document.addEventListener('DOMContentLoaded', () => bindMoneyInputs(document));
   const observer = new MutationObserver(() => bindMoneyInputs(document));
   observer.observe(document.documentElement, { childList: true, subtree: true });

@@ -11,7 +11,7 @@ const APP_CONFIG = {
   /* ── Configuración de almacenamiento ─────────────────────── */
   db: {
     name:    'cuentasDB',
-    version: 12,
+    version: 13,
     /* Stores que se crearán en IndexedDB */
     stores: {
       transactions: { keyPath: 'id', autoIncrement: true },
@@ -36,6 +36,10 @@ const APP_CONFIG = {
       trading_accounts: { keyPath: 'id', autoIncrement: true },
       software_projects: { keyPath: 'id', autoIncrement: true },
       personal_patrimony: { keyPath: 'id', autoIncrement: true },
+      marketplace_products: { keyPath: 'id', autoIncrement: true },
+      marketplace_categories: { keyPath: 'id', autoIncrement: true },
+      marketplace_suppliers: { keyPath: 'id', autoIncrement: true },
+      marketplace_sales: { keyPath: 'id', autoIncrement: true },
       financial_accounts: { keyPath: 'id', autoIncrement: true },
       financial_categories: { keyPath: 'value' },
       financial_state_snapshots: { keyPath: 'id', autoIncrement: true },
@@ -56,6 +60,7 @@ const APP_CONFIG = {
 
   /* ── Rutas registradas de la SPA ─────────────────────────── */
   routes: {
+    marketplace: { label: 'Marketplace',      icon: 'MK',  module: 'marketplace' },
     dashboard:   { label: 'Dashboard',       icon: '⬡',  module: 'dashboard'   },
     finance:     { label: 'Finanzas',         icon: '◈',  module: 'finance'     },
     loans:       { label: 'Préstamos',        icon: '⟳',  module: 'loans'       },
@@ -89,5 +94,5 @@ const APP_CONFIG = {
 };
 
 /* Exportar para uso en otros módulos */
-window.APP_CONFIG = APP_CONFIG;
+if (typeof window !== 'undefined') window.APP_CONFIG = APP_CONFIG;
 export { APP_CONFIG };

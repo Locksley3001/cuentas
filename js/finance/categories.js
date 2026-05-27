@@ -288,7 +288,7 @@ export function classifyFinancialMovement(row = {}) {
   const commercialAssetImpact = pickExplicit(row.commercialAssetImpact, amount * (category.commercialAssetImpact || 0));
   const reserveImpact = pickExplicit(row.reserveImpact, amount * (category.reserveImpact || 0));
   const activePortfolioImpact = pickExplicit(row.activePortfolioImpact, amount * (category.activePortfolioImpact || 0));
-  const cashFlowImpact = pickExplicit(row.cashFlowImpact, amount * (category.cashFlowImpact || sign));
+  const cashFlowImpact = pickExplicit(row.cashFlowImpact, amount * (category.cashFlowImpact ?? sign));
   const isCapitalMovement = realProfitImpact === 0 && (
     liquidImpact !== 0 ||
     investedImpact !== 0 ||

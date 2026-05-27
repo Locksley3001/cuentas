@@ -61,11 +61,13 @@ async function registerRoutes() {
     loans,
     crm,
     businessModules,
+    marketplace,
   ] = await Promise.all([
     import('./modules/finance.js'),
     import('./modules/loans.js'),
     import('./modules/crm.js'),
     import('./modules/business-modules.js'),
+    import('./modules/marketplace.js'),
   ]);
 
   Router.register('finance', () => finance.initFinance(container));
@@ -73,6 +75,7 @@ async function registerRoutes() {
     container.innerHTML = '<div id="loans-container"></div>';
     await loans.initLoans();
   });
+  Router.register('marketplace', () => marketplace.initMarketplace(container));
   Router.register('crm', async () => {
     container.innerHTML = '<div id="crm-container"></div>';
     await crm.initCRM();
@@ -104,6 +107,7 @@ function bindGlobalKeys() {
       if (route === 'dashboard') DashboardModule.quickAdd();
       if (route === 'finance') document.getElementById('fin-btn-new')?.click();
       if (route === 'loans') document.getElementById('btn-new-loan')?.click();
+      if (route === 'marketplace') document.querySelector('[data-action="new-product"]')?.click();
       if (route === 'crm') document.getElementById('btn-new-lead')?.click();
       if (['animals', 'vehicles', 'trading', 'software', 'patrimony'].includes(route)) {
         document.querySelector('[data-action="create"]')?.click();
